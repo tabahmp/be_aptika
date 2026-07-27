@@ -25,7 +25,17 @@ class ProfileController extends Controller
      */
     public function update(ProfileUpdateRequest $request): JsonResponse
     {
-        $request->user()->fill($request->validated());
+        $validated = $request->validated();
+        
+        // Handle alias parameters if provided
+        if (isset($validated['jabatan']) && !isset($validated['position'])) {
+            $validated['position'] = $validated['jabatan'];
+        }
+        if (isset($validated['no_telp']) && !isset($validated['phone'])) {
+            $validated['phone'] = $validated['no_telp'];
+        }
+
+        $request->user()->fill($validated);
 
         if ($request->user()->isDirty('email')) {
             $request->user()->email_verified_at = null;
@@ -33,7 +43,10 @@ class ProfileController extends Controller
 
         $request->user()->save();
 
-        return response()->json(['message' => 'Profile updated successfully', 'user' => $request->user()]);
+        return response()->json([
+            'message' => 'Profile updated successfully',
+            'user' => $request->user(),
+        ]);
     }
 
     /**

@@ -31,6 +31,8 @@ class UserController extends Controller
             'password' => 'required|string|min:8',
             'role' => ['required', 'string', Rule::in(['admin', 'user'])],
             'is_active' => 'required|integer|in:0,1',
+            'position' => 'nullable|string|max:255',
+            'phone' => 'nullable|string|max:50',
         ]);
 
         $validated['password'] = Hash::make($validated['password']);
@@ -65,6 +67,8 @@ class UserController extends Controller
             'password' => 'nullable|string|min:8',
             'role' => ['required', 'string', Rule::in(['admin', 'user'])],
             'is_active' => 'required|integer|in:0,1',
+            'position' => 'nullable|string|max:255',
+            'phone' => 'nullable|string|max:50',
         ]);
 
         if (!empty($validated['password'])) {
