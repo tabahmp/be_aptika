@@ -34,7 +34,19 @@ class User extends Authenticatable
 
     protected $appends = [
         'avatar_url',
+        'jabatan',
+        'no_telp',
     ];
+
+    public function getJabatanAttribute(): ?string
+    {
+        return $this->position;
+    }
+
+    public function getNoTelpAttribute(): ?string
+    {
+        return $this->phone;
+    }
 
     public function getAvatarUrlAttribute(): ?string
     {
@@ -43,6 +55,10 @@ class User extends Authenticatable
         }
 
         if (str_starts_with($this->avatar, 'http://') || str_starts_with($this->avatar, 'https://')) {
+            return $this->avatar;
+        }
+
+        if (str_starts_with($this->avatar, 'data:image/')) {
             return $this->avatar;
         }
 

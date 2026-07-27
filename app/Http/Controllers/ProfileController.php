@@ -30,10 +30,10 @@ class ProfileController extends Controller
         $user = $request->user();
         
         // Handle alias parameters if provided
-        if (isset($validated['jabatan']) && !isset($validated['position'])) {
+        if (array_key_exists('jabatan', $validated) && (!isset($validated['position']) || $validated['position'] === null)) {
             $validated['position'] = $validated['jabatan'];
         }
-        if (isset($validated['no_telp']) && !isset($validated['phone'])) {
+        if (array_key_exists('no_telp', $validated) && (!isset($validated['phone']) || $validated['phone'] === null)) {
             $validated['phone'] = $validated['no_telp'];
         }
 
