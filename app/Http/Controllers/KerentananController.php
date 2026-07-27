@@ -59,6 +59,7 @@ class KerentananController extends Controller
             'perihal' => 'nullable|string',
             'deskripsi' => 'nullable|string',
             'isi_lampiran' => 'nullable|string',
+            'rekomendasi' => 'nullable|string',
             'status' => 'nullable|string',
             'lampiran' => 'nullable|file|max:10240', // Max 10MB
         ]);
@@ -117,6 +118,7 @@ class KerentananController extends Controller
             'perihal' => 'nullable|string',
             'deskripsi' => 'nullable|string',
             'isi_lampiran' => 'nullable|string',
+            'rekomendasi' => 'nullable|string',
             'status' => 'nullable|string',
             'lampiran' => 'nullable|file|max:10240',
             'hapus_lampiran' => 'nullable|boolean',

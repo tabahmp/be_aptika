@@ -17,6 +17,7 @@ class Kerentanan extends Model
         'perihal',
         'deskripsi',
         'isi_lampiran',
+        'rekomendasi',
         'lampiran',
         'lampiran_nama',
         'status',
