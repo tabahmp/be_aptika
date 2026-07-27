@@ -50,12 +50,31 @@ class ProfileController extends Controller
             }
             $user->avatar = null;
         }
-        // Handle new avatar string (Base64 data URI)
+        // Handle new avatar string (Base64 data URI) - decode and save as stored file (~30 chars) to prevent VARCHAR(255) truncation errors
         else if ($request->filled('avatar') && is_string($request->input('avatar')) && str_starts_with($request->input('avatar'), 'data:image/')) {
-            if ($user->avatar && !str_starts_with($user->avatar, 'data:image/') && Storage::disk('public')->exists($user->avatar)) {
-                Storage::disk('public')->delete($user->avatar);
+            try {
+                $base64Str = $request->input('avatar');
+                @list($typeInfo, $data) = explode(';', $base64Str);
+                @list(, $data) = explode(',', $data);
+                $imageBytes = base64_decode($data);
+
+                $ext = 'jpg';
+                if (str_contains($typeInfo, 'png')) $ext = 'png';
+                else if (str_contains($typeInfo, 'webp')) $ext = 'webp';
+                else if (str_contains($typeInfo, 'gif')) $ext = 'gif';
+
+                $filename = 'avatars/avatar_' . time() . '_' . uniqid() . '.' . $ext;
+                Storage::disk('public')->put($filename, $imageBytes);
+
+                if ($user->avatar && !str_starts_with($user->avatar, 'data:image/') && Storage::disk('public')->exists($user->avatar)) {
+                    Storage::disk('public')->delete($user->avatar);
+                }
+                $user->avatar = $filename;
+            } catch (\Throwable $e) {
+                if (strlen($request->input('avatar')) <= 255) {
+                    $user->avatar = $request->input('avatar');
+                }
             }
-            $user->avatar = $request->input('avatar');
         }
         // Handle new avatar file upload
         else if ($request->hasFile('avatar')) {
