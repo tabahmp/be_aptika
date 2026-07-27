@@ -46,7 +46,17 @@ class User extends Authenticatable
             return $this->avatar;
         }
 
-        return asset('storage/' . $this->avatar);
+        $cleanPath = ltrim($this->avatar, '/');
+        
+        try {
+            if (request() && request()->header('Host')) {
+                return request()->schemeAndHttpHost() . '/storage/' . $cleanPath;
+            }
+        } catch (\Throwable $e) {
+            // Fallback if request is not available (e.g. CLI commands)
+        }
+
+        return asset('storage/' . $cleanPath);
     }
 
     /**
