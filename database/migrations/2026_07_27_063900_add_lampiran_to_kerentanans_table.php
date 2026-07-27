@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::table('kerentanans', function (Blueprint $table) {
             if (!Schema::hasColumn('kerentanans', 'isi_lampiran')) {
-                $table->text('isi_lampiran')->nullable()->after('deskripsi');
+                $table->longText('isi_lampiran')->nullable()->after('deskripsi');
             }
             if (!Schema::hasColumn('kerentanans', 'lampiran')) {
                 $table->string('lampiran')->nullable()->after('isi_lampiran');
