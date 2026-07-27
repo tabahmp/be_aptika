@@ -16,6 +16,8 @@ class Kerentanan extends Model
         'tingkat_kerentanan',
         'perihal',
         'deskripsi',
+        'lampiran',
+        'lampiran_nama',
         'status',
     ];
 
