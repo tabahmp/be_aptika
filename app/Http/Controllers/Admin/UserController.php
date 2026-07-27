@@ -98,6 +98,10 @@ class UserController extends Controller
             ], 400);
         }
 
+        if ($user->avatar && \Illuminate\Support\Facades\Storage::disk('public')->exists($user->avatar)) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($user->avatar);
+        }
+
         $user->delete();
 
         return response()->json([

@@ -78,6 +78,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
 
     Route::get('/profile', [ProfileController::class, 'edit']);
     Route::patch('/profile', [ProfileController::class, 'update']);
+    Route::post('/profile', [ProfileController::class, 'update']);
     Route::delete('/profile', [ProfileController::class, 'destroy']);
 
     // Admin user CRUD
