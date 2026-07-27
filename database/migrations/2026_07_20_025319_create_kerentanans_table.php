@@ -21,6 +21,9 @@ return new class extends Migration
                 $table->string('tingkat_kerentanan')->nullable();
                 $table->string('perihal')->nullable();
                 $table->text('deskripsi')->nullable();
+                $table->longText('isi_lampiran')->nullable();
+                $table->string('lampiran')->nullable();
+                $table->string('lampiran_nama')->nullable();
                 $table->string('status')->default('DRAF');
                 $table->timestamps();
             });
