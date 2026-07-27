@@ -30,8 +30,8 @@ class ProfileUpdateRequest extends FormRequest
             'jabatan' => ['nullable', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50'],
             'no_telp' => ['nullable', 'string', 'max:50'],
-            'avatar' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:2048'],
-            'remove_avatar' => ['nullable', 'boolean'],
+            'avatar' => ['nullable'],
+            'remove_avatar' => ['nullable'],
         ];
     }
 }

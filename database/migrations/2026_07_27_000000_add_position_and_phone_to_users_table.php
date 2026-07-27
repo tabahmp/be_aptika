@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -12,9 +13,20 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->string('position')->nullable()->after('email');
-            $table->string('phone')->nullable()->after('position');
+            if (!Schema::hasColumn('users', 'position')) {
+                $table->string('position')->nullable()->after('email');
+            }
+            if (!Schema::hasColumn('users', 'phone')) {
+                $table->string('phone')->nullable()->after('position');
+            }
+            if (!Schema::hasColumn('users', 'avatar')) {
+                $table->longText('avatar')->nullable()->after('phone');
+            }
         });
+
+        if (Schema::hasColumn('users', 'avatar')) {
+            DB::statement("ALTER TABLE users MODIFY avatar LONGTEXT NULL");
+        }
     }
 
     /**
@@ -23,7 +35,12 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->dropColumn(['position', 'phone']);
+            $colsToDrop = array_filter(['position', 'phone', 'avatar'], function ($col) {
+                return Schema::hasColumn('users', $col);
+            });
+            if (!empty($colsToDrop)) {
+                $table->dropColumn($colsToDrop);
+            }
         });
     }
 };

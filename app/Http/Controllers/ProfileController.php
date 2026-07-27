@@ -45,15 +45,21 @@ class ProfileController extends Controller
 
         // Handle remove_avatar request
         if (!empty($validated['remove_avatar']) || $request->input('remove_avatar') === 'true' || $request->input('remove_avatar') === '1') {
-            if ($user->avatar && Storage::disk('public')->exists($user->avatar)) {
+            if ($user->avatar && !str_starts_with($user->avatar, 'data:image/') && Storage::disk('public')->exists($user->avatar)) {
                 Storage::disk('public')->delete($user->avatar);
             }
             $user->avatar = null;
         }
-
-        // Handle new avatar upload
-        if ($request->hasFile('avatar')) {
-            if ($user->avatar && Storage::disk('public')->exists($user->avatar)) {
+        // Handle new avatar string (Base64 data URI)
+        else if ($request->filled('avatar') && is_string($request->input('avatar')) && str_starts_with($request->input('avatar'), 'data:image/')) {
+            if ($user->avatar && !str_starts_with($user->avatar, 'data:image/') && Storage::disk('public')->exists($user->avatar)) {
+                Storage::disk('public')->delete($user->avatar);
+            }
+            $user->avatar = $request->input('avatar');
+        }
+        // Handle new avatar file upload
+        else if ($request->hasFile('avatar')) {
+            if ($user->avatar && !str_starts_with($user->avatar, 'data:image/') && Storage::disk('public')->exists($user->avatar)) {
                 Storage::disk('public')->delete($user->avatar);
             }
             $path = $request->file('avatar')->store('avatars', 'public');
