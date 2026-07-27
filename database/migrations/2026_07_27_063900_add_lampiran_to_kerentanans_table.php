@@ -12,8 +12,15 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('kerentanans', function (Blueprint $table) {
-            $table->string('lampiran')->nullable()->after('deskripsi');
-            $table->string('lampiran_nama')->nullable()->after('lampiran');
+            if (!Schema::hasColumn('kerentanans', 'isi_lampiran')) {
+                $table->text('isi_lampiran')->nullable()->after('deskripsi');
+            }
+            if (!Schema::hasColumn('kerentanans', 'lampiran')) {
+                $table->string('lampiran')->nullable()->after('isi_lampiran');
+            }
+            if (!Schema::hasColumn('kerentanans', 'lampiran_nama')) {
+                $table->string('lampiran_nama')->nullable()->after('lampiran');
+            }
         });
     }
 
@@ -23,7 +30,12 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('kerentanans', function (Blueprint $table) {
-            $table->dropColumn(['lampiran', 'lampiran_nama']);
+            $colsToDrop = array_filter(['isi_lampiran', 'lampiran', 'lampiran_nama'], function ($col) {
+                return Schema::hasColumn('kerentanans', $col);
+            });
+            if (!empty($colsToDrop)) {
+                $table->dropColumn($colsToDrop);
+            }
         });
     }
 };
