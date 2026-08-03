@@ -21,7 +21,34 @@ class MagangController extends Controller
         if (str_starts_with($cleanPath, 'storage/')) {
             $cleanPath = substr($cleanPath, 8);
         }
-        return asset('storage/' . $cleanPath);
+        return url('api/storage/' . $cleanPath);
+    }
+
+    /**
+     * SERVE FILE VIA API ROUTE (Bypasses webserver static file 404 blocks)
+     */
+    public function serveFile($path)
+    {
+        $cleanPath = ltrim(urldecode($path), '/');
+        if (str_starts_with($cleanPath, 'storage/')) {
+            $cleanPath = substr($cleanPath, 8);
+        }
+
+        $fullPath = storage_path('app/public/' . $cleanPath);
+
+        if (!file_exists($fullPath)) {
+            $altPath = storage_path('app/' . $cleanPath);
+            if (file_exists($altPath)) {
+                $fullPath = $altPath;
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'File tidak ditemukan di server disk.'
+                ], 404);
+            }
+        }
+
+        return response()->file($fullPath);
     }
 
     public function index()

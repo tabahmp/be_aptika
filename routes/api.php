@@ -68,8 +68,9 @@ Route::prefix('form-perubahan-it')->group(function () {
     Route::patch('/{id}/assign', [PermohonanTiController::class, 'assign']);
 });
 
-// Pendaftaran Magang Publik (Tanpa Autentikasi)
+// Pendaftaran Magang Publik & File Serving (Tanpa Autentikasi)
 Route::post('/magang', [MagangController::class, 'store']);
+Route::get('/storage/{path}', [MagangController::class, 'serveFile'])->where('path', '.*');
 
 Route::middleware(['auth:sanctum', 'active'])->group(function () {
 
