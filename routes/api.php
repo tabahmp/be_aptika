@@ -68,6 +68,9 @@ Route::prefix('form-perubahan-it')->group(function () {
     Route::patch('/{id}/assign', [PermohonanTiController::class, 'assign']);
 });
 
+// Pendaftaran Magang Publik (Tanpa Autentikasi)
+Route::post('/magang', [MagangController::class, 'store']);
+
 Route::middleware(['auth:sanctum', 'active'])->group(function () {
 
     Route::post('/logout', [AuthenticatedSessionController::class, 'destroy']);
@@ -318,7 +321,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     });
 
     // MAGANG
-    Route::apiResource('magang', MagangController::class);
+    Route::apiResource('magang', MagangController::class)->except(['store']);
 
     // NOTA DINAS
     Route::apiResource('nota-dinas', NotaDinasController::class);

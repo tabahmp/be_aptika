@@ -24,6 +24,7 @@ class MagangController extends Controller
                 'status_magang' => $item->status_magang,
                 'sertifikat' => $item->sertifikat,
                 'cv_magang' => asset('storage/' . $item->cv_magang),
+                'keterangan' => $item->keterangan,
             ];
         });
 
