@@ -11,6 +11,19 @@ class MagangController extends Controller
     /**
      * INDEX
      */
+    private function getCvUrl($cvPath)
+    {
+        if (!$cvPath) return null;
+        if (str_starts_with($cvPath, 'http://') || str_starts_with($cvPath, 'https://')) {
+            return $cvPath;
+        }
+        $cleanPath = ltrim($cvPath, '/');
+        if (str_starts_with($cleanPath, 'storage/')) {
+            $cleanPath = substr($cleanPath, 8);
+        }
+        return asset('storage/' . $cleanPath);
+    }
+
     public function index()
     {
         $data = Magang::latest()->get()->map(function ($item) {
@@ -23,7 +36,7 @@ class MagangController extends Controller
                 'tgl_selesai' => $item->tgl_selesai_magang,
                 'status_magang' => $item->status_magang,
                 'sertifikat' => $item->sertifikat,
-                'cv_magang' => asset('storage/' . $item->cv_magang),
+                'cv_magang' => $this->getCvUrl($item->cv_magang),
                 'keterangan' => $item->keterangan,
             ];
         });
@@ -81,7 +94,7 @@ class MagangController extends Controller
             'success' => true,
             'data' => [
                 ...$magang->toArray(),
-                'cv_magang' => asset('storage/' . $magang->cv_magang)
+                'cv_magang' => $this->getCvUrl($magang->cv_magang)
             ]
         ]);
     }
