@@ -37,6 +37,19 @@ class ProfileController extends Controller
             $validated['phone'] = $validated['no_telp'];
         }
 
+        if (!empty($validated['password'])) {
+            if (empty($validated['current_password'])) {
+                return response()->json([
+                    'message' => 'Password lama wajib diisi untuk mengganti password.',
+                    'errors' => ['current_password' => ['Password lama wajib diisi.']]
+                ], 422);
+            }
+            $validated['password'] = \Illuminate\Support\Facades\Hash::make($validated['password']);
+        } else {
+            unset($validated['password']);
+        }
+        unset($validated['current_password']);
+
         $user->fill($validated);
 
         if ($user->isDirty('email')) {
