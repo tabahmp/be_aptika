@@ -33,7 +33,17 @@ class UserController extends Controller
             'is_active' => 'required|integer|in:0,1',
             'position' => 'nullable|string|max:255',
             'phone' => 'nullable|string|max:50',
+            'jabatan' => 'nullable|string|max:255',
+            'no_telp' => 'nullable|string|max:50',
         ]);
+
+        if (isset($validated['jabatan']) && empty($validated['position'])) {
+            $validated['position'] = $validated['jabatan'];
+        }
+        if (isset($validated['no_telp']) && empty($validated['phone'])) {
+            $validated['phone'] = $validated['no_telp'];
+        }
+        unset($validated['jabatan'], $validated['no_telp']);
 
         $validated['password'] = Hash::make($validated['password']);
 
@@ -69,7 +79,17 @@ class UserController extends Controller
             'is_active' => 'required|integer|in:0,1',
             'position' => 'nullable|string|max:255',
             'phone' => 'nullable|string|max:50',
+            'jabatan' => 'nullable|string|max:255',
+            'no_telp' => 'nullable|string|max:50',
         ]);
+
+        if (isset($validated['jabatan']) && empty($validated['position'])) {
+            $validated['position'] = $validated['jabatan'];
+        }
+        if (isset($validated['no_telp']) && empty($validated['phone'])) {
+            $validated['phone'] = $validated['no_telp'];
+        }
+        unset($validated['jabatan'], $validated['no_telp']);
 
         if (!empty($validated['password'])) {
             $validated['password'] = Hash::make($validated['password']);

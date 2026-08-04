@@ -32,6 +32,8 @@ class ProfileUpdateRequest extends FormRequest
             'no_telp' => ['nullable', 'string', 'max:50'],
             'avatar' => ['nullable'],
             'remove_avatar' => ['nullable'],
+            'current_password' => ['nullable', 'string', 'current_password'],
+            'password' => ['nullable', 'string', \Illuminate\Validation\Rules\Password::defaults(), 'confirmed'],
         ];
     }
 }

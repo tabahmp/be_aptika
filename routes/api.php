@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\ProfileController;
 
@@ -84,6 +85,8 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update']);
     Route::post('/profile', [ProfileController::class, 'update']);
     Route::delete('/profile', [ProfileController::class, 'destroy']);
+    Route::put('/password', [PasswordController::class, 'update']);
+    Route::put('/profile/password', [PasswordController::class, 'update']);
 
     // Admin user CRUD
     Route::middleware(['role:admin'])->prefix('admin')->group(function () {
