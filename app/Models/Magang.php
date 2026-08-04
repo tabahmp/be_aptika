@@ -12,6 +12,7 @@ class Magang extends Model
         'tgl_mulai_magang',
         'tgl_selesai_magang',
         'cv_magang',
+        'nda_file',
         'sertifikat',
         'keterangan'
     ];

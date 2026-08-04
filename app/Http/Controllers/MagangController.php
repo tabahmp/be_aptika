@@ -64,6 +64,7 @@ class MagangController extends Controller
                 'status_magang' => $item->status_magang,
                 'sertifikat' => $item->sertifikat,
                 'cv_magang' => $this->getCvUrl($item->cv_magang),
+                'nda_file' => $this->getCvUrl($item->nda_file),
                 'keterangan' => $item->keterangan,
             ];
         });
@@ -87,6 +88,7 @@ class MagangController extends Controller
             'tgl_selesai_magang' => 'required|date',
 
             'cv_magang' => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:5120',
+            'nda_file' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:5120',
 
             'sertifikat' => 'nullable|in:Sudah menerima,Belum menerima',
 
@@ -97,6 +99,12 @@ class MagangController extends Controller
             $validated['cv_magang'] = $request
                 ->file('cv_magang')
                 ->store('cv-magang', 'public');
+        }
+
+        if ($request->hasFile('nda_file')) {
+            $validated['nda_file'] = $request
+                ->file('nda_file')
+                ->store('nda-file', 'public');
         }
 
         $validated['sertifikat'] = $validated['sertifikat'] ?? 'Belum menerima';
@@ -121,7 +129,8 @@ class MagangController extends Controller
             'success' => true,
             'data' => [
                 ...$magang->toArray(),
-                'cv_magang' => $this->getCvUrl($magang->cv_magang)
+                'cv_magang' => $this->getCvUrl($magang->cv_magang),
+                'nda_file' => $this->getCvUrl($magang->nda_file)
             ]
         ]);
     }
@@ -141,6 +150,7 @@ class MagangController extends Controller
             'tgl_selesai_magang' => 'required|date',
 
             'cv_magang' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:5120',
+            'nda_file' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:5120',
 
             'sertifikat' => 'required|in:Sudah menerima,Belum menerima',
 
@@ -158,12 +168,50 @@ class MagangController extends Controller
                 ->store('cv-magang', 'public');
         }
 
+        if ($request->hasFile('nda_file')) {
+
+            if ($magang->nda_file && Storage::disk('public')->exists($magang->nda_file)) {
+                Storage::disk('public')->delete($magang->nda_file);
+            }
+
+            $validated['nda_file'] = $request
+                ->file('nda_file')
+                ->store('nda-file', 'public');
+        }
+
         $magang->update($validated);
 
         return response()->json([
             'success' => true,
             'message' => 'Data berhasil diupdate.',
             'data' => $magang
+        ]);
+    }
+
+    /**
+     * UPLOAD NDA
+     */
+    public function uploadNda(Request $request, $id)
+    {
+        $magang = Magang::findOrFail($id);
+
+        $request->validate([
+            'nda_file' => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240'
+        ]);
+
+        if ($magang->nda_file && Storage::disk('public')->exists($magang->nda_file)) {
+            Storage::disk('public')->delete($magang->nda_file);
+        }
+
+        $path = $request->file('nda_file')->store('nda-file', 'public');
+        $magang->update(['nda_file' => $path]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'File NDA berhasil diupload.',
+            'data' => [
+                'nda_file' => $this->getCvUrl($path)
+            ]
         ]);
     }
 
@@ -176,6 +224,10 @@ class MagangController extends Controller
 
         if ($magang->cv_magang && Storage::disk('public')->exists($magang->cv_magang)) {
             Storage::disk('public')->delete($magang->cv_magang);
+        }
+
+        if ($magang->nda_file && Storage::disk('public')->exists($magang->nda_file)) {
+            Storage::disk('public')->delete($magang->nda_file);
         }
 
         $magang->delete();

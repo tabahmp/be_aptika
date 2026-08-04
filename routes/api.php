@@ -322,6 +322,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     });
 
     // MAGANG
+    Route::post('magang/{id}/upload-nda', [MagangController::class, 'uploadNda']);
     Route::apiResource('magang', MagangController::class)->except(['store']);
 
     // NOTA DINAS
