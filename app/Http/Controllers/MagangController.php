@@ -88,7 +88,7 @@ class MagangController extends Controller
             'tgl_selesai_magang' => 'required|date',
 
             'cv_magang' => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:5120',
-            'nda_file' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:5120',
+            'nda_file' => 'nullable|file|mimes:pdf|max:10240',
 
             'sertifikat' => 'nullable|in:Sudah menerima,Belum menerima',
 
@@ -150,7 +150,7 @@ class MagangController extends Controller
             'tgl_selesai_magang' => 'required|date',
 
             'cv_magang' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:5120',
-            'nda_file' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:5120',
+            'nda_file' => 'nullable|file|mimes:pdf|max:10240',
 
             'sertifikat' => 'required|in:Sudah menerima,Belum menerima',
 
@@ -196,7 +196,7 @@ class MagangController extends Controller
         $magang = Magang::findOrFail($id);
 
         $request->validate([
-            'nda_file' => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240'
+            'nda_file' => 'required|file|mimes:pdf|max:10240'
         ]);
 
         if ($magang->nda_file && Storage::disk('public')->exists($magang->nda_file)) {
