@@ -71,6 +71,7 @@ Route::prefix('form-perubahan-it')->group(function () {
 
 // Pendaftaran Magang Publik & File Serving (Tanpa Autentikasi)
 Route::post('/magang', [MagangController::class, 'store']);
+Route::post('/magang/{id}/upload-nda', [MagangController::class, 'uploadNda']);
 Route::get('/storage/{path}', [MagangController::class, 'serveFile'])->where('path', '.*');
 
 Route::middleware(['auth:sanctum', 'active'])->group(function () {
