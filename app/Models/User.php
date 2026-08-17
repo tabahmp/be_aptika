@@ -54,7 +54,10 @@ class User extends Authenticatable
             return null;
         }
 
-        if (str_starts_with($this->avatar, 'http://') || str_starts_with($this->avatar, 'https://')) {
+        if (
+            str_starts_with($this->avatar, 'http://') ||
+            str_starts_with($this->avatar, 'https://')
+        ) {
             return $this->avatar;
         }
 
@@ -63,7 +66,7 @@ class User extends Authenticatable
         }
 
         $cleanPath = ltrim($this->avatar, '/');
-        
+
         try {
             if (request() && request()->header('Host')) {
                 return request()->schemeAndHttpHost() . '/storage/' . $cleanPath;
@@ -131,7 +134,6 @@ class User extends Authenticatable
 
     public function sentNotifications()
     {
-        return $this->hasMany(Notification::class, 'created_by');
+        return $this->hasMany(Notification::class, 'created_by_user_id');
     }
-
 }

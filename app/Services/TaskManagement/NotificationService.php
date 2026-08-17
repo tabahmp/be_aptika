@@ -25,11 +25,13 @@ class NotificationService
                     'title' => $payload['title'],
                     'message' => $payload['message'],
                     'is_read' => false,
-                    'created_by' => $payload['created_by'] ?? null,
+                    'created_by_user_id' => $payload['created_by_user_id'] ?? null,
                 ]);
             });
         } catch (\Throwable $e) {
-            Log::warning('Notification create failed', ['error' => $e->getMessage()]);
+            Log::warning('Notification create failed', [
+                'error' => $e->getMessage(),
+            ]);
 
             return null;
         }
@@ -38,6 +40,7 @@ class NotificationService
     public function notifyBoardJoinRequest(Board $board, User $actor): void
     {
         $pm = $board->pm;
+
         if (!$pm || (int) $pm->id === (int) $actor->id) {
             return;
         }
@@ -47,51 +50,77 @@ class NotificationService
             'board_id' => $board->id,
             'type' => 'JOIN_REQUEST',
             'title' => 'Permintaan bergabung board',
-            'message' => sprintf('%s mengirim permintaan untuk bergabung ke board %s.', $actor->name, $board->name),
-            'created_by' => $actor->id,
+            'message' => sprintf(
+                '%s mengirim permintaan untuk bergabung ke board %s.',
+                $actor->name,
+                $board->name
+            ),
+            'created_by_user_id' => $actor->id,
         ]);
     }
 
-    public function notifyBoardJoinApproved(Board $board, User $recipient, User $actor): void
-    {
+    public function notifyBoardJoinApproved(
+        Board $board,
+        User $recipient,
+        User $actor
+    ): void {
         $this->create([
             'user_id' => $recipient->id,
             'board_id' => $board->id,
             'type' => 'JOIN_APPROVED',
             'title' => 'Permintaan bergabung disetujui',
-            'message' => sprintf('%s menyetujui permintaan bergabung Anda ke board %s.', $actor->name, $board->name),
-            'created_by' => $actor->id,
+            'message' => sprintf(
+                '%s menyetujui permintaan bergabung Anda ke board %s.',
+                $actor->name,
+                $board->name
+            ),
+            'created_by_user_id' => $actor->id,
         ]);
     }
 
-    public function notifyBoardJoinRejected(Board $board, User $recipient, User $actor): void
-    {
+    public function notifyBoardJoinRejected(
+        Board $board,
+        User $recipient,
+        User $actor
+    ): void {
         $this->create([
             'user_id' => $recipient->id,
             'board_id' => $board->id,
             'type' => 'JOIN_REJECTED',
             'title' => 'Permintaan bergabung ditolak',
-            'message' => sprintf('%s menolak permintaan bergabung Anda ke board %s.', $actor->name, $board->name),
-            'created_by' => $actor->id,
+            'message' => sprintf(
+                '%s menolak permintaan bergabung Anda ke board %s.',
+                $actor->name,
+                $board->name
+            ),
+            'created_by_user_id' => $actor->id,
         ]);
     }
 
     public function notifyTaskAssigned(Task $task, User $recipient): void
     {
         $actor = $task->creator ?? $task->board?->pm;
+
         $this->create([
             'user_id' => $recipient->id,
             'board_id' => $task->board_id,
             'task_id' => $task->id,
             'type' => 'TASK_ASSIGNED',
             'title' => 'Tugas baru ditugaskan',
-            'message' => sprintf('%s menugaskan Anda untuk tugas %s.', $actor?->name ?? 'Sistem', $task->title),
-            'created_by' => $actor?->id ?? null,
+            'message' => sprintf(
+                '%s menugaskan Anda untuk tugas %s.',
+                $actor?->name ?? 'Sistem',
+                $task->title
+            ),
+            'created_by_user_id' => $actor?->id ?? null,
         ]);
     }
 
-    public function notifyTaskUpdated(Task $task, User $actor, array $recipients): void
-    {
+    public function notifyTaskUpdated(
+        Task $task,
+        User $actor,
+        array $recipients
+    ): void {
         foreach ($recipients as $recipient) {
             if ((int) $recipient->id === (int) $actor->id) {
                 continue;
@@ -103,14 +132,21 @@ class NotificationService
                 'task_id' => $task->id,
                 'type' => 'TASK_UPDATED',
                 'title' => 'Tugas diperbarui',
-                'message' => sprintf('%s memperbarui tugas %s.', $actor->name, $task->title),
-                'created_by' => $actor->id,
+                'message' => sprintf(
+                    '%s memperbarui tugas %s.',
+                    $actor->name,
+                    $task->title
+                ),
+                'created_by_user_id' => $actor->id,
             ]);
         }
     }
 
-    public function notifyTaskComment(Task $task, User $actor, array $recipients): void
-    {
+    public function notifyTaskComment(
+        Task $task,
+        User $actor,
+        array $recipients
+    ): void {
         foreach ($recipients as $recipient) {
             if ((int) $recipient->id === (int) $actor->id) {
                 continue;
@@ -122,14 +158,20 @@ class NotificationService
                 'task_id' => $task->id,
                 'type' => 'TASK_COMMENT',
                 'title' => 'Komentar baru',
-                'message' => sprintf('%s mengomentari tugas %s.', $actor->name, $task->title),
-                'created_by' => $actor->id,
+                'message' => sprintf(
+                    '%s mengomentari tugas %s.',
+                    $actor->name,
+                    $task->title
+                ),
+                'created_by_user_id' => $actor->id,
             ]);
         }
     }
 
-    public function notifyStatusChanged(Task $task, array $recipients): void
-    {
+    public function notifyStatusChanged(
+        Task $task,
+        array $recipients
+    ): void {
         foreach ($recipients as $recipient) {
             $this->create([
                 'user_id' => $recipient->id,
@@ -137,44 +179,65 @@ class NotificationService
                 'task_id' => $task->id,
                 'type' => 'TASK_STATUS_CHANGED',
                 'title' => 'Status tugas berubah',
-                'message' => sprintf('Status tugas %s berubah.', $task->title),
-                'created_by' => $task->created_by,
+                'message' => sprintf(
+                    'Status tugas %s berubah.',
+                    $task->title
+                ),
+                'created_by_user_id' => $task->created_by,
             ]);
         }
     }
 
-    public function notifyBoardArchived(Board $board, array $recipients): void
-    {
+    public function notifyBoardArchived(
+        Board $board,
+        array $recipients
+    ): void {
         foreach ($recipients as $recipient) {
             $this->create([
                 'user_id' => $recipient->id,
                 'board_id' => $board->id,
                 'type' => 'BOARD_ARCHIVED',
                 'title' => 'Board diarsipkan',
-                'message' => sprintf('Board %s telah diarsipkan.', $board->name),
-                'created_by' => $board->created_by,
+                'message' => sprintf(
+                    'Board %s telah diarsipkan.',
+                    $board->name
+                ),
+                'created_by_user_id' => $board->created_by,
             ]);
         }
     }
 
-    public function notifyDueSoon(Task $task, User $recipient): void
-    {
+    public function notifyDueSoon(
+        Task $task,
+        User $recipient
+    ): void {
         $this->create([
             'user_id' => $recipient->id,
             'board_id' => $task->board_id,
             'task_id' => $task->id,
             'type' => 'TASK_DUE_SOON',
             'title' => 'Tugas akan jatuh tempo',
-            'message' => sprintf('Tugas %s akan jatuh tempo besok.', $task->title),
-            'created_by' => $task->created_by,
+            'message' => sprintf(
+                'Tugas %s akan jatuh tempo besok.',
+                $task->title
+            ),
+            'created_by_user_id' => $task->created_by,
         ]);
     }
 
-    public function getForUser(int $userId, int $limit = 15, int $offset = 0): Collection
-    {
+    public function getForUser(
+        int $userId,
+        int $limit = 15,
+        int $offset = 0
+    ): Collection {
         return Notification::query()
             ->where('user_id', $userId)
-            ->with(['board', 'task', 'createdBy', 'receiver'])
+            ->with([
+                'board',
+                'task',
+                'createdBy',
+                'user',
+            ])
             ->orderByDesc('created_at')
             ->skip($offset)
             ->limit($limit)
@@ -189,8 +252,10 @@ class NotificationService
             ->count();
     }
 
-    public function markAsRead(int $notificationId, int $userId): bool
-    {
+    public function markAsRead(
+        int $notificationId,
+        int $userId
+    ): bool {
         $notification = Notification::where('id', $notificationId)
             ->where('user_id', $userId)
             ->first();
@@ -217,8 +282,10 @@ class NotificationService
             ]);
     }
 
-    public function delete(int $notificationId, int $userId): bool
-    {
+    public function delete(
+        int $notificationId,
+        int $userId
+    ): bool {
         $notification = Notification::where('id', $notificationId)
             ->where('user_id', $userId)
             ->first();

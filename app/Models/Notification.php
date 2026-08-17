@@ -22,8 +22,8 @@ class Notification extends Model
     ];
 
     protected $casts = [
-        'is_read'  => 'boolean',
-        'read_at'  => 'datetime',
+        'is_read' => 'boolean',
+        'read_at' => 'datetime',
     ];
 
     public function user()
@@ -33,16 +33,29 @@ class Notification extends Model
 
     public function board()
     {
-        return $this->belongsTo(Board::class)->select(['id', 'name']);
+        return $this->belongsTo(Board::class)
+            ->select(['id', 'name']);
     }
 
     public function task()
     {
-        return $this->belongsTo(Task::class)->select(['id', 'title', 'status']);
+        return $this->belongsTo(Task::class)
+            ->select(['id', 'title', 'status']);
     }
 
     public function createdByUser()
     {
-        return $this->belongsTo(User::class, 'created_by_user_id')->select(['id', 'name']);
+        return $this->belongsTo(
+            User::class,
+            'created_by_user_id'
+        )->select(['id', 'name']);
+    }
+
+    public function createdBy()
+    {
+        return $this->belongsTo(
+            User::class,
+            'created_by_user_id'
+        )->select(['id', 'name']);
     }
 }
