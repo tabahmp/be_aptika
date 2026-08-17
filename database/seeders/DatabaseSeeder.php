@@ -46,5 +46,10 @@ class DatabaseSeeder extends Seeder
                 'is_active' => 1,
             ]
         );
+
+        // Seed Project Data
+        $this->call([
+            ProjectDataSeeder::class,
+        ]);
     }
 }
