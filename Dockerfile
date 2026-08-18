@@ -1,4 +1,4 @@
-FROM php:8.4-cli
+FROM php:8.4-fpm
 
 WORKDIR /var/www
 
@@ -10,25 +10,38 @@ RUN apt-get update && apt-get install -y \
     libzip-dev \
     libpng-dev \
     libonig-dev \
-    libxml2-dev
-
-RUN docker-php-ext-install \
+    libxml2-dev \
+    && docker-php-ext-install \
     pdo_mysql \
     mbstring \
     bcmath \
     gd \
     zip \
-    xml
+    xml \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 COPY . .
 
 ENV COMPOSER_ALLOW_SUPERUSER=1
-RUN composer install --no-dev --optimize-autoloader
 
-RUN chown -R www-data:www-data storage bootstrap/cache
+RUN composer install \
+    --no-dev \
+    --optimize-autoloader \
+    --no-interaction
 
-EXPOSE 8080
+RUN mkdir -p \
+    storage/framework/cache \
+    storage/framework/sessions \
+    storage/framework/views \
+    storage/logs \
+    bootstrap/cache
 
-CMD ["sh", "-c", "php artisan migrate --force && php artisan storage:link && php artisan config:cache && php artisan route:cache && php artisan serve --host=0.0.0.0 --port=8080"]
+RUN chown -R www-data:www-data \
+    storage \
+    bootstrap/cache
+
+EXPOSE 9000
+
+CMD ["php-fpm"]

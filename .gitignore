@@ -27,3 +27,7 @@ Thumbs.db
 
 # L5 Swagger generated documentation
 storage/api-docs/
+
+# Database backups
+/database/backups/
+*.sql
