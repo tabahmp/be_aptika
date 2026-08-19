@@ -96,17 +96,36 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         $user = $request->user();
         $user->load('bidang');
 
-        // Ambil daftar service beserta status is_enabled untuk bidang user
-        $services = \App\Models\Service::all()->map(function ($service) use ($user) {
-            $bidangService = \App\Models\BidangService::where('bidang_id', $user->bidang_id)
-                ->where('service_id', $service->id)
-                ->first();
+        $isAdminAptika = $user->isAdminAptika();
+
+        // Map ketersediaan bidang_services untuk bidang user
+        $bidangServicesMap = \App\Models\BidangService::where('bidang_id', $user->bidang_id)
+            ->pluck('is_enabled', 'service_id')
+            ->toArray();
+
+        $allServices = \App\Models\Service::all();
+        $servicesByParent = $allServices->keyBy('id');
+
+        $services = $allServices->map(function ($service) use ($isAdminAptika, $bidangServicesMap, $servicesByParent) {
+            if ($isAdminAptika) {
+                $isEnabled = true;
+            } else {
+                $ownStatus = isset($bidangServicesMap[$service->id]) ? (bool)$bidangServicesMap[$service->id] : false;
+
+                if ($service->parent_id && isset($servicesByParent[$service->parent_id])) {
+                    $parentStatus = isset($bidangServicesMap[$service->parent_id]) ? (bool)$bidangServicesMap[$service->parent_id] : false;
+                    $isEnabled = $ownStatus && $parentStatus;
+                } else {
+                    $isEnabled = $ownStatus;
+                }
+            }
 
             return [
                 'id' => $service->id,
+                'parent_id' => $service->parent_id,
                 'code' => $service->code,
                 'name' => $service->name,
-                'is_enabled' => $bidangService ? (bool) $bidangService->is_enabled : false,
+                'is_enabled' => $isEnabled,
             ];
         });
 
@@ -127,7 +146,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
                 'name' => $user->bidang->name,
             ] : null,
             'services' => $services,
-            'is_admin_aptika' => $user->isAdminAptika(),
+            'is_admin_aptika' => $isAdminAptika,
         ]);
     });
 
