@@ -16,7 +16,7 @@ class UserController extends Controller
      */
     public function index(): JsonResponse
     {
-        $users = User::all();
+        $users = User::with('bidang')->get();
         return response()->json($users);
     }
 
@@ -30,6 +30,7 @@ class UserController extends Controller
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8',
             'role' => ['required', 'string', Rule::in(['admin', 'user'])],
+            'bidang_id' => 'required|exists:bidangs,id',
             'is_active' => 'required|integer|in:0,1',
             'position' => 'nullable|string|max:255',
             'phone' => 'nullable|string|max:50',
@@ -48,6 +49,7 @@ class UserController extends Controller
         $validated['password'] = Hash::make($validated['password']);
 
         $user = User::create($validated);
+        $user->load('bidang');
 
         return response()->json([
             'message' => 'User created successfully',
@@ -60,7 +62,7 @@ class UserController extends Controller
      */
     public function show($id): JsonResponse
     {
-        $user = User::findOrFail($id);
+        $user = User::with('bidang')->findOrFail($id);
         return response()->json($user);
     }
 
@@ -76,6 +78,7 @@ class UserController extends Controller
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
             'password' => 'nullable|string|min:8',
             'role' => ['required', 'string', Rule::in(['admin', 'user'])],
+            'bidang_id' => 'nullable|exists:bidangs,id',
             'is_active' => 'required|integer|in:0,1',
             'position' => 'nullable|string|max:255',
             'phone' => 'nullable|string|max:50',

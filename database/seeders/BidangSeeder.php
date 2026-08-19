@@ -31,5 +31,8 @@ class BidangSeeder extends Seeder
                 ]
             );
         }
+
+        // Pastikan seluruh user eksisting yang belum terikat bidang dialokasikan ke Bidang APTIKA (ID 3)
+        DB::table('users')->whereNull('bidang_id')->update(['bidang_id' => 3]);
     }
 }
