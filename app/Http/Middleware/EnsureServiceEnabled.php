@@ -34,17 +34,37 @@ class EnsureServiceEnabled
             return $next($request);
         }
 
-        // Periksa status service pada tabel bidang_services
-        $isEnabled = DB::table('bidang_services')
-            ->join('services', 'services.id', '=', 'bidang_services.service_id')
-            ->where('bidang_services.bidang_id', $user->bidang_id)
+        // Periksa status service dan parent service pada tabel bidang_services
+        $serviceInfo = DB::table('services')
+            ->leftJoin('bidang_services as bs_child', function ($join) use ($user) {
+                $join->on('bs_child.service_id', '=', 'services.id')
+                     ->where('bs_child.bidang_id', '=', $user->bidang_id);
+            })
+            ->leftJoin('services as parent', 'parent.id', '=', 'services.parent_id')
+            ->leftJoin('bidang_services as bs_parent', function ($join) use ($user) {
+                $join->on('bs_parent.service_id', '=', 'parent.id')
+                     ->where('bs_parent.bidang_id', '=', $user->bidang_id);
+            })
             ->where('services.code', $serviceCode)
-            ->value('bidang_services.is_enabled');
+            ->select(
+                'services.name as service_name',
+                'bs_child.is_enabled as child_enabled',
+                'parent.name as parent_name',
+                'bs_parent.is_enabled as parent_enabled'
+            )
+            ->first();
 
-        if (!$isEnabled) {
+        if (!$serviceInfo) {
+            return $next($request);
+        }
+
+        $childEnabled = (bool) $serviceInfo->child_enabled;
+        $parentEnabled = $serviceInfo->parent_enabled !== null ? (bool) $serviceInfo->parent_enabled : true;
+
+        if (!$childEnabled || !$parentEnabled) {
             return response()->json([
                 'success' => false,
-                'message' => "Layanan {$serviceCode} saat ini dinonaktifkan untuk bidang Anda. Hubungi Administrator Aptika untuk mengaktifkannya.",
+                'message' => "Layanan {$serviceInfo->service_name} saat ini dinonaktifkan untuk bidang Anda. Hubungi Administrator Aptika untuk mengaktifkannya.",
                 'error_code' => 'SERVICE_DISABLED',
             ], Response::HTTP_FORBIDDEN);
         }

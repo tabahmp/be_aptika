@@ -12,10 +12,21 @@ class Service extends Model
     protected $table = 'services';
 
     protected $fillable = [
+        'parent_id',
         'code',
         'name',
         'description',
     ];
+
+    public function parent()
+    {
+        return $this->belongsTo(Service::class, 'parent_id');
+    }
+
+    public function subServices()
+    {
+        return $this->hasMany(Service::class, 'parent_id');
+    }
 
     public function bidangs()
     {

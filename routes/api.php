@@ -70,6 +70,14 @@ Route::prefix('form-perubahan-it')->group(function () {
     Route::patch('/{id}/assign', [PermohonanTiController::class, 'assign']);
 });
 
+// Public API: Daftar Bidang / Unit Kerja Diskominfo Jabar
+Route::get('/bidangs', function () {
+    return response()->json([
+        'success' => true,
+        'data' => \App\Models\Bidang::select('id', 'code', 'name', 'description')->get(),
+    ]);
+});
+
 // Pendaftaran Magang Publik & File Serving (Tanpa Autentikasi)
 Route::post('/magang', [MagangController::class, 'store']);
 Route::post('/magang/{id}/upload-nda', [MagangController::class, 'uploadNda']);

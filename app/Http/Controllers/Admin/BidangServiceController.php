@@ -17,7 +17,7 @@ class BidangServiceController extends Controller
     public function index()
     {
         $bidangs = Bidang::with(['services' => function ($query) {
-            $query->select('services.id', 'services.code', 'services.name')
+            $query->select('services.id', 'services.parent_id', 'services.code', 'services.name')
                   ->withPivot('is_enabled');
         }])->get();
 
@@ -29,6 +29,7 @@ class BidangServiceController extends Controller
                 'services' => $bidang->services->map(function ($service) {
                     return [
                         'service_id' => $service->id,
+                        'parent_id' => $service->parent_id,
                         'code' => $service->code,
                         'name' => $service->name,
                         'is_enabled' => (bool) $service->pivot->is_enabled,

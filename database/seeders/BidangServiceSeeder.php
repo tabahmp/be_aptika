@@ -9,17 +9,19 @@ class BidangServiceSeeder extends Seeder
 {
     public function run(): void
     {
-        // Default Configuration Matrix:
-        // APTIKA (id:3) -> All 4 Services Enabled
-        // Bidang Lain (id: 1, 2, 4, 5, 6, 7) -> Services 1, 3, 4 Enabled; Service 2 (IKI_REPORT) Disabled
-
+        // 7 Bidang (1 s/d 7)
         $bidangIds = [1, 2, 3, 4, 5, 6, 7];
-        $serviceIds = [1, 2, 3, 4];
+
+        // 15 Services & Sub-Services (1 s/d 15)
+        $serviceIds = range(1, 15);
+
+        // Service IDs for IKI Report (2, 10, 11, 12, 13, 14, 15)
+        $ikiServiceIds = [2, 10, 11, 12, 13, 14, 15];
 
         foreach ($bidangIds as $bId) {
             foreach ($serviceIds as $sId) {
-                // Service 2 (IKI_REPORT) hanya aktif untuk APTIKA (bId = 3) secara default
-                $isEnabled = ($sId === 2) ? ($bId === 3) : true;
+                // IKI Report services & sub-services are enabled only for APTIKA (id: 3) by default
+                $isEnabled = in_array($sId, $ikiServiceIds) ? ($bId === 3) : true;
 
                 DB::table('bidang_services')->updateOrInsert(
                     ['bidang_id' => $bId, 'service_id' => $sId],
