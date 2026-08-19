@@ -15,6 +15,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'active' => \App\Http\Middleware\CheckActiveUser::class,
             'role' => \App\Http\Middleware\CheckRole::class,
+            'admin.aptika' => \App\Http\Middleware\EnsureAdminAptika::class,
+            'service.enabled' => \App\Http\Middleware\EnsureServiceEnabled::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

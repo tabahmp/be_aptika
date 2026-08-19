@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToBidang;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class NotaDinas extends Model
 {
+    use BelongsToBidang;
     protected $table = 'nota_dinas';
 
     protected $fillable = [
@@ -23,6 +25,7 @@ class NotaDinas extends Model
         'lampiran',
         'catatan',
         'user_id',
+        'bidang_id',
     ];
 
     protected $casts = [

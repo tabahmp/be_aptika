@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToBidang;
 use Illuminate\Database\Eloquent\Model;
 
 class Kerentanan extends Model
 {
+    use BelongsToBidang;
     protected $table = 'kerentanans';
 
     protected $fillable = [
@@ -21,6 +23,7 @@ class Kerentanan extends Model
         'lampiran',
         'lampiran_nama',
         'status',
+        'bidang_id',
     ];
 
     protected $casts = [

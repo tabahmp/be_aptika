@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToBidang;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Spd extends Model
 {
-    use HasFactory;
+    use HasFactory, BelongsToBidang;
 
     protected $fillable = [
         'no_spd',
@@ -29,6 +30,7 @@ class Spd extends Model
         'uang_transport',
         'uang_hotel',
         'status',
+        'bidang_id',
     ];
 
     protected $casts = [

@@ -54,6 +54,7 @@ use App\Http\Controllers\TaskManagement\NotificationController;
 use App\Http\Controllers\MagangController;
 use App\Http\Controllers\NotaDinasController;
 use App\Http\Controllers\PermohonanTiController;
+use App\Http\Controllers\Admin\BidangServiceController;
 
 // Route::post('/register', [RegisteredUserController::class, 'store']); dinonaktifkan karena bisa di akses oleh siapa saja dan gak harus login
 Route::post('/login', [AuthenticatedSessionController::class, 'store']);
@@ -82,6 +83,46 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         return $request->user();
     });
 
+    // Endpoint profil lengkap dengan bidang dan service permission
+    Route::get('/me', function (Request $request) {
+        $user = $request->user();
+        $user->load('bidang');
+
+        // Ambil daftar service beserta status is_enabled untuk bidang user
+        $services = \App\Models\Service::all()->map(function ($service) use ($user) {
+            $bidangService = \App\Models\BidangService::where('bidang_id', $user->bidang_id)
+                ->where('service_id', $service->id)
+                ->first();
+
+            return [
+                'id' => $service->id,
+                'code' => $service->code,
+                'name' => $service->name,
+                'is_enabled' => $bidangService ? (bool) $bidangService->is_enabled : false,
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'position' => $user->position,
+                'phone' => $user->phone,
+                'avatar_url' => $user->avatar_url,
+                'role' => $user->role,
+            ],
+            'bidang' => $user->bidang ? [
+                'id' => $user->bidang->id,
+                'code' => $user->bidang->code,
+                'name' => $user->bidang->name,
+            ] : null,
+            'services' => $services,
+            'is_admin_aptika' => $user->isAdminAptika(),
+        ]);
+    });
+
     Route::get('/profile', [ProfileController::class, 'edit']);
     Route::patch('/profile', [ProfileController::class, 'update']);
     Route::post('/profile', [ProfileController::class, 'update']);
@@ -89,10 +130,15 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::put('/password', [PasswordController::class, 'update']);
     Route::put('/profile/password', [PasswordController::class, 'update']);
 
-    // Admin user CRUD
-    Route::middleware(['role:admin'])->prefix('admin')->group(function () {
+    // Admin Panel (HANYA Admin Aptika)
+    Route::middleware(['admin.aptika'])->prefix('admin')->group(function () {
         Route::apiResource('users', \App\Http\Controllers\Admin\UserController::class);
+        Route::get('bidang-services', [BidangServiceController::class, 'index']);
+        Route::put('bidang-services', [BidangServiceController::class, 'update']);
     });
+
+    // === LAYANAN: ADMINISTRASI SURAT ===
+    Route::middleware(['service.enabled:ADMINISTRASI_SURAT'])->group(function () {
 
     Route::prefix('spd')->group(function () {
         Route::apiResource('detail-perjalanan', DetailPerjalananController::class);
@@ -104,7 +150,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::apiResource('rekening', RekeningController::class);
         Route::apiResource('pegawai', PegawaiController::class);
         Route::apiResource('spd-peserta', SpdPesertaController::class);
-});
+    });
 
     Route::get('/spd/stats', [SpdProposalController::class, 'stats']);
     // Route::apiResource('/spd', SpdProposalController::class);
@@ -134,6 +180,11 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::delete('/{id}', [SpdController::class, 'destroy']);
         Route::post('/laporan', [SpdController::class, 'submitLaporan']);
     });
+
+    }); // end ADMINISTRASI_SURAT group
+
+    // === LAYANAN: IKI REPORT ===
+    Route::middleware(['service.enabled:IKI_REPORT'])->group(function () {
 
     Route::prefix('sadajabar')->group(function () {
         Route::get('/export', [LaporanController::class, 'sadajabarExport']);
@@ -286,6 +337,11 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::delete('/team-support-facilities/{id}', [TeamSupportFacilityController::class, 'destroy']);
     });
 
+    }); // end IKI_REPORT group
+
+    // === LAYANAN: MANAJEMEN TUGAS DIGITAL ===
+    Route::middleware(['service.enabled:MANAJEMEN_TUGAS'])->group(function () {
+
     Route::prefix('task-management')->group(function () {
         Route::get('/boards', [BoardController::class, 'index']);
         Route::post('/boards', [BoardController::class, 'store']);
@@ -325,9 +381,19 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::delete('/notifications/{id}', [NotificationController::class, 'destroy']);
     });
 
+    }); // end MANAJEMEN_TUGAS group
+
+    // === LAYANAN: MAGANG ===
+    Route::middleware(['service.enabled:MAGANG'])->group(function () {
+
     // MAGANG
     Route::post('magang/{id}/upload-nda', [MagangController::class, 'uploadNda']);
     Route::apiResource('magang', MagangController::class)->except(['store']);
+
+    }); // end MAGANG group
+
+    // === LAYANAN: ADMINISTRASI SURAT (BAGIAN 2: NOTA DINAS, PENTEST, KERENTANAN) ===
+    Route::middleware(['service.enabled:ADMINISTRASI_SURAT'])->group(function () {
 
     // NOTA DINAS
     Route::apiResource('nota-dinas', NotaDinasController::class);
@@ -340,5 +406,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     // KERENTANAN
     Route::apiResource('kerentanan', \App\Http\Controllers\KerentananController::class);
     Route::get('kerentanan-export', [\App\Http\Controllers\KerentananController::class, 'export']);
+
+    }); // end ADMINISTRASI_SURAT group (bagian 2)
 });
 

@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToBidang;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Board extends Model
 {
-    use HasFactory;
+    use HasFactory, BelongsToBidang;
 
     protected $fillable = [
         'name',
@@ -17,6 +18,7 @@ class Board extends Model
         'end_date',
         'status',
         'visibility',
+        'bidang_id',
     ];
 
     protected $casts = [

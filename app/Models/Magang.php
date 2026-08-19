@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToBidang;
 use Illuminate\Database\Eloquent\Model;
 
 class Magang extends Model
 {
+    use BelongsToBidang;
     protected $fillable = [
         'nama',
         'nama_kampus',
@@ -14,7 +16,8 @@ class Magang extends Model
         'cv_magang',
         'nda_file',
         'sertifikat',
-        'keterangan'
+        'keterangan',
+        'bidang_id',
     ];
 
     protected $casts = [

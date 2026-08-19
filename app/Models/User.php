@@ -25,6 +25,7 @@ class User extends Authenticatable
         'password',
         'role',
         'is_active',
+        'bidang_id',
     ];
 
     protected $hidden = [
@@ -135,5 +136,21 @@ class User extends Authenticatable
     public function sentNotifications()
     {
         return $this->hasMany(Notification::class, 'created_by_user_id');
+    }
+
+    /**
+     * Relasi ke tabel bidangs (unit kerja pengguna).
+     */
+    public function bidang()
+    {
+        return $this->belongsTo(Bidang::class, 'bidang_id');
+    }
+
+    /**
+     * Cek apakah user adalah Admin Aptika (satu-satunya role yang bisa mengakses Admin Panel).
+     */
+    public function isAdminAptika(): bool
+    {
+        return $this->role === 'admin' && $this->bidang?->code === 'APTIKA';
     }
 }
