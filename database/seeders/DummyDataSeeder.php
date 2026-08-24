@@ -37,6 +37,17 @@ class DummyDataSeeder extends Seeder
             ],
             [
                 'id' => 3,
+                'name' => 'Admin Sekretariat',
+                'email' => 'admin.sekretariat@jabarprov.go.id',
+                'password' => Hash::make('password123'),
+                'role' => 'admin',
+                'bidang_id' => 1, // SEKRETARIAT
+                'is_active' => 1,
+                'position' => 'Admin Kepegawaian & TU',
+                'phone' => '081234567892',
+            ],
+            [
+                'id' => 4,
                 'name' => 'Budi Sekretariat',
                 'email' => 'sekretariat@jabarprov.go.id',
                 'password' => Hash::make('password123'),

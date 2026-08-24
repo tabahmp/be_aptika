@@ -55,6 +55,10 @@ use App\Http\Controllers\MagangController;
 use App\Http\Controllers\NotaDinasController;
 use App\Http\Controllers\PermohonanTiController;
 use App\Http\Controllers\Admin\BidangServiceController;
+use App\Http\Controllers\Admin\AuditLogController;
+use App\Http\Controllers\Admin\ImpersonateController;
+use App\Http\Controllers\Admin\ActiveSessionController;
+use App\Http\Controllers\Admin\AdminStatsController;
 
 // Route::post('/register', [RegisteredUserController::class, 'store']); dinonaktifkan karena bisa di akses oleh siapa saja dan gak harus login
 Route::post('/login', [AuthenticatedSessionController::class, 'store']);
@@ -99,25 +103,22 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         $isAdminAptika = $user->isAdminAptika();
 
         // Map ketersediaan bidang_services untuk bidang user
-        $bidangServicesMap = \App\Models\BidangService::where('bidang_id', $user->bidang_id)
+        $bidangId = $user->bidang_id ?? 3;
+        $bidangServicesMap = \App\Models\BidangService::where('bidang_id', $bidangId)
             ->pluck('is_enabled', 'service_id')
             ->toArray();
 
         $allServices = \App\Models\Service::all();
         $servicesByParent = $allServices->keyBy('id');
 
-        $services = $allServices->map(function ($service) use ($isAdminAptika, $bidangServicesMap, $servicesByParent) {
-            if ($isAdminAptika) {
-                $isEnabled = true;
-            } else {
-                $ownStatus = isset($bidangServicesMap[$service->id]) ? (bool)$bidangServicesMap[$service->id] : false;
+        $services = $allServices->map(function ($service) use ($bidangServicesMap, $servicesByParent) {
+            $ownStatus = isset($bidangServicesMap[$service->id]) ? (bool)$bidangServicesMap[$service->id] : true;
 
-                if ($service->parent_id && isset($servicesByParent[$service->parent_id])) {
-                    $parentStatus = isset($bidangServicesMap[$service->parent_id]) ? (bool)$bidangServicesMap[$service->parent_id] : false;
-                    $isEnabled = $ownStatus && $parentStatus;
-                } else {
-                    $isEnabled = $ownStatus;
-                }
+            if ($service->parent_id && isset($servicesByParent[$service->parent_id])) {
+                $parentStatus = isset($bidangServicesMap[$service->parent_id]) ? (bool)$bidangServicesMap[$service->parent_id] : true;
+                $isEnabled = $ownStatus && $parentStatus;
+            } else {
+                $isEnabled = $ownStatus;
             }
 
             return [
@@ -157,11 +158,33 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::put('/password', [PasswordController::class, 'update']);
     Route::put('/profile/password', [PasswordController::class, 'update']);
 
-    // Admin Panel (HANYA Admin Aptika)
-    Route::middleware(['admin.aptika'])->prefix('admin')->group(function () {
+    // ── Admin Panel: Dapat diakses oleh SEMUA Admin (Admin Bidang & Super Admin) ──
+    Route::middleware(['role:admin'])->prefix('admin')->group(function () {
+
+        // Statistik ringkasan dashboard admin
+        Route::get('stats', [AdminStatsController::class, 'index']);
+
+        // Manajemen Pengguna (scoping berdasarkan role, lihat UserController)
         Route::apiResource('users', \App\Http\Controllers\Admin\UserController::class);
+
+        // Konfigurasi Matriks Layanan Bidang
         Route::get('bidang-services', [BidangServiceController::class, 'index']);
         Route::put('bidang-services', [BidangServiceController::class, 'update']);
+
+        // ── Super Admin Only (Admin Aptika) ──
+        Route::middleware(['super_admin'])->group(function () {
+            // Audit Log
+            Route::get('audit-logs',       [AuditLogController::class,      'index']);
+            Route::get('audit-logs/{id}',  [AuditLogController::class,      'show']);
+
+            // Impersonate User
+            Route::post('impersonate/{userId}',   [ImpersonateController::class, 'impersonate']);
+            Route::delete('impersonate/{userId}', [ImpersonateController::class, 'stopImpersonate']);
+
+            // Active Sessions & Force Logout
+            Route::get('active-sessions',              [ActiveSessionController::class, 'index']);
+            Route::delete('active-sessions/{tokenId}', [ActiveSessionController::class, 'forceLogout']);
+        });
     });
 
     // === LAYANAN: ADMINISTRASI SURAT ===

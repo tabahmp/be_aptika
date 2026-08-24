@@ -86,10 +86,15 @@ class MagangController extends Controller
      */
     public function store(Request $request)
     {
+        // Jika user login dan bidang_id tidak dikirim, otomatis isi dengan bidang_id user
+        if (auth()->check() && !$request->filled('bidang_id') && auth()->user()->bidang_id) {
+            $request->merge(['bidang_id' => auth()->user()->bidang_id]);
+        }
+
         $validated = $request->validate([
             'nama' => 'required|string|max:255',
             'nama_kampus' => 'required|string|max:255',
-            'bidang_id' => 'required|exists:bidangs,id',
+            'bidang_id' => auth()->check() ? 'nullable|exists:bidangs,id' : 'required|exists:bidangs,id',
 
             'tgl_mulai_magang' => 'required|date',
             'tgl_selesai_magang' => 'required|date',
@@ -101,6 +106,10 @@ class MagangController extends Controller
 
             'keterangan' => 'nullable|string'
         ]);
+
+        if (empty($validated['bidang_id']) && auth()->check() && auth()->user()->bidang_id) {
+            $validated['bidang_id'] = auth()->user()->bidang_id;
+        }
 
         if ($request->hasFile('cv_magang')) {
             $validated['cv_magang'] = $request
@@ -153,6 +162,7 @@ class MagangController extends Controller
         $validated = $request->validate([
             'nama' => 'required|string|max:255',
             'nama_kampus' => 'required|string|max:255',
+            'bidang_id' => 'nullable|exists:bidangs,id',
 
             'tgl_mulai_magang' => 'required|date',
             'tgl_selesai_magang' => 'required|date',
