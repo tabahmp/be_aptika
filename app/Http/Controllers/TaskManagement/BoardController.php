@@ -93,7 +93,7 @@ class BoardController extends Controller
     public function show(string $id)
     {
         try {
-            $board = Board::with([
+            $board = Board::withoutGlobalScopes()->with([
                 'pm:id,name,email',
                 'bidang:id,name,code',
                 'members:id,board_id,user_id,membership_status',
@@ -222,19 +222,22 @@ class BoardController extends Controller
         ]);
 
         try {
-            $board = Board::findOrFail($id);
+            $board = Board::withoutGlobalScopes()->findOrFail($id);
 
             $user = Auth::user();
-            $isAdmin = $user->role === 'admin' || (method_exists($user, 'isAdminAptika') && $user->isAdminAptika());
-            if ((int) $board->created_by !== (int) $user->id && !$isAdmin) {
+            $isSuperAdmin = method_exists($user, 'isAdminAptika') && $user->isAdminAptika();
+            $isOwner = (int) $board->created_by === (int) $user->id;
+            $isBidangAdmin = $user->role === 'admin' && ((int) $user->bidang_id === (int) $board->bidang_id || empty($board->bidang_id));
+
+            if (!$isOwner && !$isSuperAdmin && !$isBidangAdmin) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Anda tidak berwenang mengubah board ini.',
-                    'errors' => 'Hanya PM atau Admin yang dapat mengubah board.',
+                    'errors' => 'Hanya PM pembuat proyek atau Admin yang dapat mengubah board.',
                 ], 403);
             }
 
-            DB::transaction(function () use ($board, $validated, $isAdmin) {
+            DB::transaction(function () use ($board, $validated, $user, $isSuperAdmin) {
                 $payload = [
                     'name' => $validated['name'] ?? $board->name,
                     'description' => array_key_exists('description', $validated) ? $validated['description'] : $board->description,
@@ -244,7 +247,7 @@ class BoardController extends Controller
                     'visibility' => $this->resolveVisibility($validated, $board->visibility),
                 ];
 
-                if ($isAdmin && array_key_exists('bidang_id', $validated) && !empty($validated['bidang_id'])) {
+                if (($user->role === 'admin' || $isSuperAdmin) && array_key_exists('bidang_id', $validated) && !empty($validated['bidang_id'])) {
                     $payload['bidang_id'] = $validated['bidang_id'];
                 }
 
@@ -302,19 +305,32 @@ class BoardController extends Controller
         }
 
         try {
-            $board = Board::findOrFail($id);
+            $board = Board::withoutGlobalScopes()->findOrFail($id);
 
             $user = Auth::user();
-            $isAdmin = $user->role === 'admin' || (method_exists($user, 'isAdminAptika') && $user->isAdminAptika());
-            if ((int) $board->created_by !== (int) $user->id && !$isAdmin) {
+            $isSuperAdmin = method_exists($user, 'isAdminAptika') && $user->isAdminAptika();
+            $isOwner = (int) $board->created_by === (int) $user->id;
+            $isBidangAdmin = $user->role === 'admin' && ((int) $user->bidang_id === (int) $board->bidang_id || empty($board->bidang_id));
+
+            if (!$isOwner && !$isSuperAdmin && !$isBidangAdmin) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Anda tidak berwenang menghapus board ini.',
-                    'errors' => 'Hanya PM atau Admin yang dapat menghapus board.',
+                    'errors' => 'Hanya PM pembuat proyek atau Admin yang dapat menghapus board.',
                 ], 403);
             }
 
             DB::transaction(function () use ($board) {
+                // Delete related tasks and their comments/activities/attachments
+                $tasks = \App\Models\Task::withoutGlobalScopes()->where('board_id', $board->id)->get();
+                foreach ($tasks as $task) {
+                    \App\Models\TaskComment::where('task_id', $task->id)->delete();
+                    \App\Models\TaskActivity::where('task_id', $task->id)->delete();
+                    \App\Models\TaskAttachment::where('task_id', $task->id)->delete();
+                    $task->delete();
+                }
+                \App\Models\BoardMember::where('board_id', $board->id)->delete();
+                \App\Models\Notification::where('board_id', $board->id)->delete();
                 $board->delete();
             });
 
