@@ -141,11 +141,21 @@ class TaskController extends Controller
             $board = Board::findOrFail($validated['board_id']);
 
             $isAdmin = Auth::user()->role === 'admin';
-            if ((int) $board->created_by !== Auth::id() && !$isAdmin) {
+            $isPM = (int) $board->created_by === Auth::id();
+
+            // Cek apakah user adalah member yang memiliki izin can_create_task
+            $member = BoardMember::where('board_id', $board->id)
+                ->where('user_id', Auth::id())
+                ->where('membership_status', 'accepted')
+                ->first();
+
+            $canCreateTask = $isAdmin || $isPM || ($member && $member->can_create_task);
+
+            if (!$canCreateTask) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Anda tidak berwenang membuat task di board ini.',
-                    'errors' => 'Hanya PM yang dapat membuat task.',
+                    'errors' => 'Hanya Project Manager atau anggota yang telah diberi izin oleh PM yang dapat membuat tugas.',
                 ], 403);
             }
 

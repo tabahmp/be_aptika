@@ -404,6 +404,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::get('/boards/{boardId}/join-requests', [BoardMemberController::class, 'joinRequests']);
         Route::post('/boards/{boardId}/members/{userId}/approve', [BoardMemberController::class, 'approve']);
         Route::post('/boards/{boardId}/members/{userId}/reject', [BoardMemberController::class, 'reject']);
+        Route::patch('/boards/{boardId}/members/{userId}/permission', [BoardMemberController::class, 'updatePermission']);
         Route::delete('/boards/{boardId}/members/leave', [BoardMemberController::class, 'leave']);
 
         Route::get('/tasks', [TaskController::class, 'index']);
