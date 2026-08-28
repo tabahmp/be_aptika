@@ -15,6 +15,7 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        // Seed Master Data
         $this->call([
             ServiceTypeSeeder::class,
             GeneralOpdSeeder::class,
@@ -23,6 +24,13 @@ class DatabaseSeeder extends Seeder
             RegencySeeder::class,
             RekeningSeeder::class,
             PegawaiSeeder::class,
+        ]);
+
+        // Seed Multi-Bidang & Service
+        $this->call([
+            BidangSeeder::class,
+            ServiceSeeder::class,
+            BidangServiceSeeder::class,
         ]);
 
         // Seed Admin User

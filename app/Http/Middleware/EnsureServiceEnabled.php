@@ -11,9 +11,13 @@ use Symfony\Component\HttpFoundation\Response;
  * Middleware EnsureServiceEnabled
  *
  * Memastikan layanan (service) yang diminta berada dalam status aktif
- * (is_enabled == true) untuk bidang dari user yang terautentikasi.
+ * untuk bidang dari user yang terautentikasi.
  *
- * Penggunaan di route: middleware('service.enabled:ADMINISTRASI_SURAT')
+ * Jika belum ada record bidang_services untuk service tersebut,
+ * maka service dianggap aktif secara default.
+ *
+ * Penggunaan di route:
+ * middleware('service.enabled:ADMINISTRASI_SURAT')
  */
 class EnsureServiceEnabled
 {
@@ -29,21 +33,22 @@ class EnsureServiceEnabled
             ], Response::HTTP_FORBIDDEN);
         }
 
-        // Admin Aptika bypass pengecekan service (akses penuh)
+        // Admin Aptika memiliki akses penuh ke seluruh service.
         if ($user->isAdminAptika()) {
             return $next($request);
         }
 
-        // Periksa status service dan parent service pada tabel bidang_services
+        // Cari service berdasarkan code beserta status service
+        // dan parent service untuk bidang user.
         $serviceInfo = DB::table('services')
             ->leftJoin('bidang_services as bs_child', function ($join) use ($user) {
                 $join->on('bs_child.service_id', '=', 'services.id')
-                     ->where('bs_child.bidang_id', '=', $user->bidang_id);
+                    ->where('bs_child.bidang_id', '=', $user->bidang_id);
             })
             ->leftJoin('services as parent', 'parent.id', '=', 'services.parent_id')
             ->leftJoin('bidang_services as bs_parent', function ($join) use ($user) {
                 $join->on('bs_parent.service_id', '=', 'parent.id')
-                     ->where('bs_parent.bidang_id', '=', $user->bidang_id);
+                    ->where('bs_parent.bidang_id', '=', $user->bidang_id);
             })
             ->where('services.code', $serviceCode)
             ->select(
@@ -54,13 +59,40 @@ class EnsureServiceEnabled
             )
             ->first();
 
+        // Jika service tidak ditemukan, jangan memblokir route.
+        return $this->checkServiceAccess(
+            $request,
+            $next,
+            $serviceInfo
+        );
+    }
+
+    /**
+     * Mengecek status service dan parent service.
+     *
+     * NULL berarti belum ada konfigurasi pada bidang tersebut,
+     * sehingga dianggap aktif secara default.
+     */
+    private function checkServiceAccess(
+        Request $request,
+        Closure $next,
+        $serviceInfo
+    ): Response {
         if (!$serviceInfo) {
             return $next($request);
         }
 
-        $childEnabled = (bool) $serviceInfo->child_enabled;
-        $parentEnabled = $serviceInfo->parent_enabled !== null ? (bool) $serviceInfo->parent_enabled : true;
+        // NULL = default aktif.
+        $childEnabled = $serviceInfo->child_enabled !== null
+            ? (bool) $serviceInfo->child_enabled
+            : true;
 
+        // Parent juga menggunakan aturan NULL = aktif.
+        $parentEnabled = $serviceInfo->parent_enabled !== null
+            ? (bool) $serviceInfo->parent_enabled
+            : true;
+
+        // Service hanya aktif jika dirinya sendiri dan parent-nya aktif.
         if (!$childEnabled || !$parentEnabled) {
             return response()->json([
                 'success' => false,
