@@ -76,8 +76,45 @@ Route::prefix('form-perubahan-it')->group(function () {
 });
 
 // ============================================================
-// PUBLIC MASTER DATA
+// PUBLIC MASTER DATA & SYSTEM HEALTH
 // ============================================================
+
+// Public Health Check & Database Status
+Route::get('/system/db-status', function () {
+    try {
+        $bidangsCount = \Illuminate\Support\Facades\DB::table('bidangs')->count();
+        $servicesCount = \Illuminate\Support\Facades\DB::table('services')->count();
+        $bidangServicesCount = \Illuminate\Support\Facades\DB::table('bidang_services')->count();
+        
+        $usersNullBidang = \Illuminate\Support\Facades\DB::table('users')->whereNull('bidang_id')->count();
+        $boardsNullBidang = \Illuminate\Support\Facades\DB::table('boards')->whereNull('bidang_id')->count();
+        $notaDinasNullBidang = \Illuminate\Support\Facades\DB::table('nota_dinas')->whereNull('bidang_id')->count();
+        $magangNullBidang = \Illuminate\Support\Facades\DB::table('magangs')->whereNull('bidang_id')->count();
+
+        return response()->json([
+            'success' => true,
+            'database' => 'connected',
+            'summary' => [
+                'total_bidangs' => $bidangsCount,
+                'total_services' => $servicesCount,
+                'total_bidang_services' => $bidangServicesCount,
+            ],
+            'data_tagged_aptika_check' => [
+                'users_null_bidang' => $usersNullBidang,
+                'boards_null_bidang' => $boardsNullBidang,
+                'nota_dinas_null_bidang' => $notaDinasNullBidang,
+                'magangs_null_bidang' => $magangNullBidang,
+                'is_all_clean' => ($usersNullBidang === 0 && $boardsNullBidang === 0 && $notaDinasNullBidang === 0 && $magangNullBidang === 0),
+            ],
+            'bidangs' => \Illuminate\Support\Facades\DB::table('bidangs')->get(['id', 'code', 'name']),
+        ]);
+    } catch (\Throwable $e) {
+        return response()->json([
+            'success' => false,
+            'error' => $e->getMessage(),
+        ], 500);
+    }
+});
 
 // Public API: Daftar Bidang / Unit Kerja Diskominfo Jabar
 Route::get('/bidangs', function () {

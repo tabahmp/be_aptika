@@ -9,6 +9,20 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Pastikan tabel bidangs memiliki minimal APTIKA (id: 3)
+        if (Schema::hasTable('bidangs') && !DB::table('bidangs')->where('id', 3)->exists()) {
+            DB::table('bidangs')->updateOrInsert(
+                ['id' => 3],
+                [
+                    'code' => 'APTIKA',
+                    'name' => 'Bidang Aplikasi Informatika',
+                    'description' => 'Bidang Aplikasi Informatika',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]
+            );
+        }
+
         Schema::table('users', function (Blueprint $table) {
             if (!Schema::hasColumn('users', 'bidang_id')) {
                 $table->foreignId('bidang_id')
@@ -21,7 +35,7 @@ return new class extends Migration
             }
         });
 
-        // Set default bidang_id = 3 (APTIKA) untuk user eksisting yang belum terisi
+        // Set default bidang_id = 3 (APTIKA) untuk seluruh user eksisting yang belum terisi
         if (Schema::hasTable('bidangs') && DB::table('bidangs')->where('id', 3)->exists()) {
             DB::table('users')->whereNull('bidang_id')->update(['bidang_id' => 3]);
         }
