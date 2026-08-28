@@ -54,8 +54,14 @@ use App\Http\Controllers\TaskManagement\NotificationController;
 use App\Http\Controllers\MagangController;
 use App\Http\Controllers\NotaDinasController;
 use App\Http\Controllers\PermohonanTiController;
+use App\Http\Controllers\Admin\BidangServiceController;
+use App\Http\Controllers\Admin\AuditLogController;
+use App\Http\Controllers\Admin\ImpersonateController;
+use App\Http\Controllers\Admin\ActiveSessionController;
+use App\Http\Controllers\Admin\AdminStatsController;
 
-// Route::post('/register', [RegisteredUserController::class, 'store']); dinonaktifkan karena bisa di akses oleh siapa saja dan gak harus login
+// Route::post('/register', [RegisteredUserController::class, 'store']);
+// Dinonaktifkan karena registrasi publik tidak diperbolehkan.
 Route::post('/login', [AuthenticatedSessionController::class, 'store']);
 
 // Form Perubahan IT (permohonan TI)
@@ -69,10 +75,49 @@ Route::prefix('form-perubahan-it')->group(function () {
     Route::patch('/{id}/assign', [PermohonanTiController::class, 'assign']);
 });
 
-// Pendaftaran Magang Publik & File Serving (Tanpa Autentikasi)
+// ============================================================
+// PUBLIC MASTER DATA
+// ============================================================
+
+// Public API: Daftar Bidang / Unit Kerja Diskominfo Jabar
+Route::get('/bidangs', function () {
+    return response()->json([
+        'success' => true,
+        'data' => \App\Models\Bidang::select(
+            'id',
+            'code',
+            'name',
+            'description'
+        )->get(),
+    ]);
+});
+
+// Public API: Daftar Layanan / Service
+Route::get('/services', function () {
+    return response()->json([
+        'success' => true,
+        'data' => \App\Models\Service::select(
+            'id',
+            'parent_id',
+            'code',
+            'name',
+            'description'
+        )
+            ->orderBy('id')
+            ->get(),
+    ]);
+});
+
+// Pendaftaran Magang Publik & File Serving
 Route::post('/magang', [MagangController::class, 'store']);
 Route::post('/magang/{id}/upload-nda', [MagangController::class, 'uploadNda']);
-Route::get('/storage/{path}', [MagangController::class, 'serveFile'])->where('path', '.*');
+Route::get('/storage/{path}', [MagangController::class, 'serveFile'])
+    ->where('path', '.*');
+
+
+// ============================================================
+// AUTHENTICATED API
+// ============================================================
 
 Route::middleware(['auth:sanctum', 'active'])->group(function () {
 
@@ -82,263 +127,1199 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         return $request->user();
     });
 
+    // Endpoint profil lengkap dengan bidang dan service permission
+    Route::get('/me', function (Request $request) {
+        $user = $request->user();
+
+        $user->load('bidang');
+
+        $isAdminAptika = $user->isAdminAptika();
+
+        // Map ketersediaan bidang_services untuk bidang user
+        $bidangId = $user->bidang_id ?? 3;
+
+        $bidangServicesMap = \App\Models\BidangService::where(
+            'bidang_id',
+            $bidangId
+        )
+            ->pluck('is_enabled', 'service_id')
+            ->toArray();
+
+        $allServices = \App\Models\Service::all();
+        $servicesByParent = $allServices->keyBy('id');
+
+        $services = $allServices->map(
+            function ($service) use (
+                $bidangServicesMap,
+                $servicesByParent
+            ) {
+                $ownStatus = isset($bidangServicesMap[$service->id])
+                    ? (bool) $bidangServicesMap[$service->id]
+                    : true;
+
+                if (
+                    $service->parent_id &&
+                    isset($servicesByParent[$service->parent_id])
+                ) {
+                    $parentStatus = isset(
+                        $bidangServicesMap[$service->parent_id]
+                    )
+                        ? (bool) $bidangServicesMap[$service->parent_id]
+                        : true;
+
+                    $isEnabled = $ownStatus && $parentStatus;
+                } else {
+                    $isEnabled = $ownStatus;
+                }
+
+                return [
+                    'id' => $service->id,
+                    'parent_id' => $service->parent_id,
+                    'code' => $service->code,
+                    'name' => $service->name,
+                    'is_enabled' => $isEnabled,
+                ];
+            }
+        );
+
+        return response()->json([
+            'success' => true,
+
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'position' => $user->position,
+                'phone' => $user->phone,
+                'avatar_url' => $user->avatar_url,
+                'role' => $user->role,
+            ],
+
+            'bidang' => $user->bidang
+                ? [
+                    'id' => $user->bidang->id,
+                    'code' => $user->bidang->code,
+                    'name' => $user->bidang->name,
+                ]
+                : null,
+
+            'services' => $services,
+
+            'is_admin_aptika' => $isAdminAptika,
+        ]);
+    });
+
+    // Profile
     Route::get('/profile', [ProfileController::class, 'edit']);
     Route::patch('/profile', [ProfileController::class, 'update']);
     Route::post('/profile', [ProfileController::class, 'update']);
     Route::delete('/profile', [ProfileController::class, 'destroy']);
+
     Route::put('/password', [PasswordController::class, 'update']);
     Route::put('/profile/password', [PasswordController::class, 'update']);
 
-    // Admin user CRUD
-    Route::middleware(['role:admin'])->prefix('admin')->group(function () {
-        Route::apiResource('users', \App\Http\Controllers\Admin\UserController::class);
-    });
 
-    Route::prefix('spd')->group(function () {
-        Route::apiResource('detail-perjalanan', DetailPerjalananController::class);
-        Route::patch(
-            'detail-perjalanan/{id}/status',
-            [DetailPerjalananController::class, 'updateStatus']
-        );
-    
-        Route::apiResource('rekening', RekeningController::class);
-        Route::apiResource('pegawai', PegawaiController::class);
-        Route::apiResource('spd-peserta', SpdPesertaController::class);
+    // ========================================================
+    // ADMIN PANEL
+    // ========================================================
+
+    Route::middleware(['role:admin'])
+        ->prefix('admin')
+        ->group(function () {
+
+            // Statistik ringkasan dashboard admin
+            Route::get(
+                'stats',
+                [AdminStatsController::class, 'index']
+            );
+
+            // Manajemen Pengguna
+            Route::apiResource(
+                'users',
+                \App\Http\Controllers\Admin\UserController::class
+            );
+
+            // Konfigurasi Matriks Layanan Bidang
+            Route::get(
+                'bidang-services',
+                [BidangServiceController::class, 'index']
+            );
+
+            Route::put(
+                'bidang-services',
+                [BidangServiceController::class, 'update']
+            );
+
+            // Super Admin Only
+            Route::middleware(['super_admin'])->group(function () {
+
+                // Audit Log
+                Route::get(
+                    'audit-logs',
+                    [AuditLogController::class, 'index']
+                );
+
+                Route::get(
+                    'audit-logs/{id}',
+                    [AuditLogController::class, 'show']
+                );
+
+                // Impersonate User
+                Route::post(
+                    'impersonate/{userId}',
+                    [ImpersonateController::class, 'impersonate']
+                );
+
+                Route::delete(
+                    'impersonate/{userId}',
+                    [ImpersonateController::class, 'stopImpersonate']
+                );
+
+                // Active Sessions & Force Logout
+                Route::get(
+                    'active-sessions',
+                    [ActiveSessionController::class, 'index']
+                );
+
+                Route::delete(
+                    'active-sessions/{tokenId}',
+                    [ActiveSessionController::class, 'forceLogout']
+                );
+            });
+        });
+
+
+    // ========================================================
+    // LAYANAN: ADMINISTRASI SURAT
+    // ========================================================
+
+    Route::middleware(['service.enabled:ADMINISTRASI_SURAT'])
+        ->group(function () {
+
+            Route::prefix('spd')->group(function () {
+
+                Route::apiResource(
+                    'detail-perjalanan',
+                    DetailPerjalananController::class
+                );
+
+                Route::patch(
+                    'detail-perjalanan/{id}/status',
+                    [
+                        DetailPerjalananController::class,
+                        'updateStatus'
+                    ]
+                );
+
+                Route::apiResource(
+                    'rekening',
+                    RekeningController::class
+                );
+
+                Route::apiResource(
+                    'pegawai',
+                    PegawaiController::class
+                );
+
+                Route::apiResource(
+                    'spd-peserta',
+                    SpdPesertaController::class
+                );
+            });
+
+            Route::get(
+                '/spd/stats',
+                [SpdProposalController::class, 'stats']
+            );
+
+            Route::prefix('smartjabar')->group(function () {
+
+                Route::get(
+                    '/export',
+                    [LaporanController::class, 'smartjabarExport']
+                );
+
+                Route::get(
+                    '/joined-apps',
+                    [JoinedAppController::class, 'index']
+                );
+
+                Route::get(
+                    '/joined-apps/create',
+                    [JoinedAppController::class, 'create']
+                );
+
+                Route::post(
+                    '/joined-apps',
+                    [JoinedAppController::class, 'store']
+                );
+
+                Route::get(
+                    '/joined-apps/{id}/edit',
+                    [JoinedAppController::class, 'edit']
+                );
+
+                Route::put(
+                    '/joined-apps/{id}',
+                    [JoinedAppController::class, 'update']
+                );
+
+                Route::delete(
+                    '/joined-apps/{id}',
+                    [JoinedAppController::class, 'destroy']
+                );
+
+                Route::get(
+                    '/stats',
+                    [UsageStatController::class, 'index']
+                );
+
+                Route::get(
+                    '/stats/create',
+                    [UsageStatController::class, 'create']
+                );
+
+                Route::post(
+                    '/stats',
+                    [UsageStatController::class, 'store']
+                );
+
+                Route::get(
+                    '/stats/{id}/edit',
+                    [UsageStatController::class, 'edit']
+                );
+
+                Route::put(
+                    '/stats/{id}',
+                    [UsageStatController::class, 'update']
+                );
+
+                Route::delete(
+                    '/stats/{id}',
+                    [UsageStatController::class, 'destroy']
+                );
+            });
+
+            Route::prefix('spd')->group(function () {
+
+                Route::get(
+                    '/',
+                    [SpdController::class, 'index']
+                );
+
+                Route::get(
+                    '/{id}',
+                    [SpdController::class, 'show']
+                );
+
+                Route::post(
+                    '/',
+                    [SpdController::class, 'store']
+                );
+
+                Route::put(
+                    '/{id}',
+                    [SpdController::class, 'update']
+                );
+
+                Route::delete(
+                    '/{id}',
+                    [SpdController::class, 'destroy']
+                );
+
+                Route::post(
+                    '/laporan',
+                    [SpdController::class, 'submitLaporan']
+                );
+            });
+        });
+
+
+    // ========================================================
+    // LAYANAN: IKI REPORT
+    // ========================================================
+
+    Route::middleware(['service.enabled:IKI_REPORT'])
+        ->group(function () {
+
+            Route::middleware(['service.enabled:IKI_SADAJABAR'])->prefix('sadajabar')->group(function () {
+
+                Route::get(
+                    '/export',
+                    [LaporanController::class, 'sadajabarExport']
+                );
+
+                Route::get(
+                    '/integrasi',
+                    [AppIntegrationController::class, 'index']
+                );
+
+                Route::get(
+                    '/integrasi/create',
+                    [AppIntegrationController::class, 'create']
+                );
+
+                Route::post(
+                    '/integrasi',
+                    [AppIntegrationController::class, 'store']
+                );
+
+                Route::get(
+                    '/integrasi/{id}/edit',
+                    [AppIntegrationController::class, 'edit']
+                );
+
+                Route::put(
+                    '/integrasi/{id}',
+                    [AppIntegrationController::class, 'update']
+                );
+
+                Route::delete(
+                    '/integrasi/{id}',
+                    [AppIntegrationController::class, 'destroy']
+                );
+
+                Route::get(
+                    '/enkripsi',
+                    [EncryptionStatController::class, 'index']
+                );
+
+                Route::get(
+                    '/enkripsi/create',
+                    [EncryptionStatController::class, 'create']
+                );
+
+                Route::post(
+                    '/enkripsi',
+                    [EncryptionStatController::class, 'store']
+                );
+
+                Route::get(
+                    '/enkripsi/{id}/edit',
+                    [EncryptionStatController::class, 'edit']
+                );
+
+                Route::put(
+                    '/enkripsi/{id}',
+                    [EncryptionStatController::class, 'update']
+                );
+
+                Route::delete(
+                    '/enkripsi/{id}',
+                    [EncryptionStatController::class, 'destroy']
+                );
+            });
+
+            Route::prefix('rekayasa')->group(function () {
+
+                Route::get(
+                    '/export',
+                    [LaporanController::class, 'rekayasaExport']
+                );
+
+                Route::get(
+                    '/application-replications/summary',
+                    [
+                        ApplicationReplicationController::class,
+                        'summary'
+                    ]
+                );
+
+                Route::get(
+                    '/application-replications',
+                    [
+                        ApplicationReplicationController::class,
+                        'index'
+                    ]
+                );
+
+                Route::get(
+                    '/application-replications/create',
+                    [
+                        ApplicationReplicationController::class,
+                        'create'
+                    ]
+                );
+
+                Route::post(
+                    '/application-replications',
+                    [
+                        ApplicationReplicationController::class,
+                        'store'
+                    ]
+                );
+
+                Route::get(
+                    '/application-replications/{id}/edit',
+                    [
+                        ApplicationReplicationController::class,
+                        'edit'
+                    ]
+                );
+
+                Route::put(
+                    '/application-replications/{id}',
+                    [
+                        ApplicationReplicationController::class,
+                        'update'
+                    ]
+                );
+
+                Route::delete(
+                    '/application-replications/{id}',
+                    [
+                        ApplicationReplicationController::class,
+                        'destroy'
+                    ]
+                );
+
+                Route::get(
+                    '/mentoring-performances',
+                    [
+                        MentoringPerformanceController::class,
+                        'index'
+                    ]
+                );
+
+                Route::get(
+                    '/mentoring-performances/create',
+                    [
+                        MentoringPerformanceController::class,
+                        'create'
+                    ]
+                );
+
+                Route::post(
+                    '/mentoring-performances',
+                    [
+                        MentoringPerformanceController::class,
+                        'store'
+                    ]
+                );
+
+                Route::get(
+                    '/mentoring-performances/{id}/edit',
+                    [
+                        MentoringPerformanceController::class,
+                        'edit'
+                    ]
+                );
+
+                Route::put(
+                    '/mentoring-performances/{id}',
+                    [
+                        MentoringPerformanceController::class,
+                        'update'
+                    ]
+                );
+
+                Route::delete(
+                    '/mentoring-performances/{id}',
+                    [
+                        MentoringPerformanceController::class,
+                        'destroy'
+                    ]
+                );
+            });
+
+            Route::prefix('intop')->group(function () {
+
+                Route::get(
+                    '/export',
+                    [LaporanController::class, 'intopExport']
+                );
+
+                Route::get(
+                    '/integration-summaries',
+                    [IntegrationSummaryController::class, 'index']
+                );
+
+                Route::get(
+                    '/integration-summaries/create',
+                    [IntegrationSummaryController::class, 'create']
+                );
+
+                Route::post(
+                    '/integration-summaries',
+                    [IntegrationSummaryController::class, 'store']
+                );
+
+                Route::get(
+                    '/integration-summaries/{id}/edit',
+                    [IntegrationSummaryController::class, 'edit']
+                );
+
+                Route::put(
+                    '/integration-summaries/{id}',
+                    [IntegrationSummaryController::class, 'update']
+                );
+
+                Route::delete(
+                    '/integration-summaries/{id}',
+                    [IntegrationSummaryController::class, 'destroy']
+                );
+
+                Route::get(
+                    '/service-catalogs',
+                    [ServiceCatalogController::class, 'index']
+                );
+
+                Route::get(
+                    '/service-catalogs/create',
+                    [ServiceCatalogController::class, 'create']
+                );
+
+                Route::post(
+                    '/service-catalogs',
+                    [ServiceCatalogController::class, 'store']
+                );
+
+                Route::get(
+                    '/service-catalogs/{id}/edit',
+                    [ServiceCatalogController::class, 'edit']
+                );
+
+                Route::put(
+                    '/service-catalogs/{id}',
+                    [ServiceCatalogController::class, 'update']
+                );
+
+                Route::delete(
+                    '/service-catalogs/{id}',
+                    [ServiceCatalogController::class, 'destroy']
+                );
+
+                Route::get(
+                    '/intop-mandate-service-summaries',
+                    [
+                        IntopMandateServiceSummaryController::class,
+                        'index'
+                    ]
+                );
+
+                Route::get(
+                    '/intop-mandate-service-summaries/create',
+                    [
+                        IntopMandateServiceSummaryController::class,
+                        'create'
+                    ]
+                );
+
+                Route::post(
+                    '/intop-mandate-service-summaries',
+                    [
+                        IntopMandateServiceSummaryController::class,
+                        'store'
+                    ]
+                );
+
+                Route::get(
+                    '/intop-mandate-service-summaries/{id}/edit',
+                    [
+                        IntopMandateServiceSummaryController::class,
+                        'edit'
+                    ]
+                );
+
+                Route::put(
+                    '/intop-mandate-service-summaries/{id}',
+                    [
+                        IntopMandateServiceSummaryController::class,
+                        'update'
+                    ]
+                );
+
+                Route::delete(
+                    '/intop-mandate-service-summaries/{id}',
+                    [
+                        IntopMandateServiceSummaryController::class,
+                        'destroy'
+                    ]
+                );
+            });
+
+            Route::prefix('sidebar')->group(function () {
+
+                Route::get(
+                    '/export',
+                    [LaporanController::class, 'sidebarExport']
+                );
+
+                Route::get(
+                    '/document-stats',
+                    [DocumentStatController::class, 'index']
+                );
+
+                Route::get(
+                    '/document-stats/create',
+                    [DocumentStatController::class, 'create']
+                );
+
+                Route::post(
+                    '/document-stats',
+                    [DocumentStatController::class, 'store']
+                );
+
+                Route::get(
+                    '/document-stats/{id}/edit',
+                    [DocumentStatController::class, 'edit']
+                );
+
+                Route::put(
+                    '/document-stats/{id}',
+                    [DocumentStatController::class, 'update']
+                );
+
+                Route::delete(
+                    '/document-stats/{id}',
+                    [DocumentStatController::class, 'destroy']
+                );
+
+                Route::get(
+                    '/metrics',
+                    [MetricController::class, 'index']
+                );
+
+                Route::get(
+                    '/metrics/create',
+                    [MetricController::class, 'create']
+                );
+
+                Route::post(
+                    '/metrics',
+                    [MetricController::class, 'store']
+                );
+
+                Route::get(
+                    '/metrics/{id}/edit',
+                    [MetricController::class, 'edit']
+                );
+
+                Route::put(
+                    '/metrics/{id}',
+                    [MetricController::class, 'update']
+                );
+
+                Route::delete(
+                    '/metrics/{id}',
+                    [MetricController::class, 'destroy']
+                );
+
+                Route::get(
+                    '/opd-usages',
+                    [OpdUsageController::class, 'index']
+                );
+
+                Route::get(
+                    '/opd-usages/create',
+                    [OpdUsageController::class, 'create']
+                );
+
+                Route::post(
+                    '/opd-usages',
+                    [OpdUsageController::class, 'store']
+                );
+
+                Route::get(
+                    '/opd-usages/{id}/edit',
+                    [OpdUsageController::class, 'edit']
+                );
+
+                Route::put(
+                    '/opd-usages/{id}',
+                    [OpdUsageController::class, 'update']
+                );
+
+                Route::delete(
+                    '/opd-usages/{id}',
+                    [OpdUsageController::class, 'destroy']
+                );
+            });
+
+            Route::prefix('appman')->group(function () {
+
+                Route::get(
+                    '/export',
+                    [LaporanController::class, 'appmanExport']
+                );
+
+                // Kerentanan pada aplikasi Pemprov Jabar
+                Route::get(
+                    '/app-vulnerabilities',
+                    [AppVulnerabilityController::class, 'index']
+                );
+
+                Route::get(
+                    '/app-vulnerabilities/create',
+                    [AppVulnerabilityController::class, 'create']
+                );
+
+                Route::post(
+                    '/app-vulnerabilities',
+                    [AppVulnerabilityController::class, 'store']
+                );
+
+                Route::get(
+                    '/app-vulnerabilities/{id}/edit',
+                    [AppVulnerabilityController::class, 'edit']
+                );
+
+                Route::put(
+                    '/app-vulnerabilities/{id}',
+                    [AppVulnerabilityController::class, 'update']
+                );
+
+                Route::delete(
+                    '/app-vulnerabilities/{id}',
+                    [AppVulnerabilityController::class, 'destroy']
+                );
+
+                // Aplikasi / layanan yang menjadi target pengembangan
+                Route::get(
+                    '/development-targets',
+                    [DevelopmentTargetController::class, 'index']
+                );
+
+                Route::get(
+                    '/development-targets/create',
+                    [DevelopmentTargetController::class, 'create']
+                );
+
+                Route::post(
+                    '/development-targets',
+                    [DevelopmentTargetController::class, 'store']
+                );
+
+                Route::get(
+                    '/development-targets/{id}/edit',
+                    [DevelopmentTargetController::class, 'edit']
+                );
+
+                Route::put(
+                    '/development-targets/{id}',
+                    [DevelopmentTargetController::class, 'update']
+                );
+
+                Route::delete(
+                    '/development-targets/{id}',
+                    [DevelopmentTargetController::class, 'destroy']
+                );
+
+                // Layanan Drive Jabar
+                Route::get(
+                    '/drive-jabar-stats',
+                    [DriveJabarStatController::class, 'index']
+                );
+
+                Route::get(
+                    '/drive-jabar-stats/create',
+                    [DriveJabarStatController::class, 'create']
+                );
+
+                Route::post(
+                    '/drive-jabar-stats',
+                    [DriveJabarStatController::class, 'store']
+                );
+
+                Route::get(
+                    '/drive-jabar-stats/{id}/edit',
+                    [DriveJabarStatController::class, 'edit']
+                );
+
+                Route::put(
+                    '/drive-jabar-stats/{id}',
+                    [DriveJabarStatController::class, 'update']
+                );
+
+                Route::delete(
+                    '/drive-jabar-stats/{id}',
+                    [DriveJabarStatController::class, 'destroy']
+                );
+
+                // Layanan Pengelolaan Email
+                Route::get(
+                    '/email-management-stats',
+                    [EmailManagementStatController::class, 'index']
+                );
+
+                Route::get(
+                    '/email-management-stats/create',
+                    [EmailManagementStatController::class, 'create']
+                );
+
+                Route::post(
+                    '/email-management-stats',
+                    [EmailManagementStatController::class, 'store']
+                );
+
+                Route::get(
+                    '/email-management-stats/{id}/edit',
+                    [EmailManagementStatController::class, 'edit']
+                );
+
+                Route::put(
+                    '/email-management-stats/{id}',
+                    [EmailManagementStatController::class, 'update']
+                );
+
+                Route::delete(
+                    '/email-management-stats/{id}',
+                    [EmailManagementStatController::class, 'destroy']
+                );
+
+                // Pemetaan integrasi aplikasi
+                Route::get(
+                    '/integration-mappings',
+                    [IntegrationMappingController::class, 'index']
+                );
+
+                Route::get(
+                    '/integration-mappings/create',
+                    [IntegrationMappingController::class, 'create']
+                );
+
+                Route::post(
+                    '/integration-mappings',
+                    [IntegrationMappingController::class, 'store']
+                );
+
+                Route::get(
+                    '/integration-mappings/{id}/edit',
+                    [IntegrationMappingController::class, 'edit']
+                );
+
+                Route::put(
+                    '/integration-mappings/{id}',
+                    [IntegrationMappingController::class, 'update']
+                );
+
+                Route::delete(
+                    '/integration-mappings/{id}',
+                    [IntegrationMappingController::class, 'destroy']
+                );
+
+                // Pendataan aplikasi 2026
+                Route::get(
+                    '/inventory-stats',
+                    [InventoryStatController::class, 'index']
+                );
+
+                Route::get(
+                    '/inventory-stats/create',
+                    [InventoryStatController::class, 'create']
+                );
+
+                Route::post(
+                    '/inventory-stats',
+                    [InventoryStatController::class, 'store']
+                );
+
+                Route::get(
+                    '/inventory-stats/{id}/edit',
+                    [InventoryStatController::class, 'edit']
+                );
+
+                Route::put(
+                    '/inventory-stats/{id}',
+                    [InventoryStatController::class, 'update']
+                );
+
+                Route::delete(
+                    '/inventory-stats/{id}',
+                    [InventoryStatController::class, 'destroy']
+                );
+
+                // Katalaps Kabupaten Kota
+                Route::get(
+                    '/katalaps-regencies',
+                    [KatalapsRegencyController::class, 'index']
+                );
+
+                Route::get(
+                    '/katalaps-regencies/create',
+                    [KatalapsRegencyController::class, 'create']
+                );
+
+                Route::post(
+                    '/katalaps-regencies',
+                    [KatalapsRegencyController::class, 'store']
+                );
+
+                Route::get(
+                    '/katalaps-regencies/{id}/edit',
+                    [KatalapsRegencyController::class, 'edit']
+                );
+
+                Route::put(
+                    '/katalaps-regencies/{id}',
+                    [KatalapsRegencyController::class, 'update']
+                );
+
+                Route::delete(
+                    '/katalaps-regencies/{id}',
+                    [KatalapsRegencyController::class, 'destroy']
+                );
+
+                // Fasilitasi dukungan tim pada pengembangan aplikasi
+                Route::get(
+                    '/team-support-facilities',
+                    [TeamSupportFacilityController::class, 'index']
+                );
+
+                Route::get(
+                    '/team-support-facilities/create',
+                    [TeamSupportFacilityController::class, 'create']
+                );
+
+                Route::post(
+                    '/team-support-facilities',
+                    [TeamSupportFacilityController::class, 'store']
+                );
+
+                Route::get(
+                    '/team-support-facilities/{id}/edit',
+                    [TeamSupportFacilityController::class, 'edit']
+                );
+
+                Route::put(
+                    '/team-support-facilities/{id}',
+                    [TeamSupportFacilityController::class, 'update']
+                );
+
+                Route::delete(
+                    '/team-support-facilities/{id}',
+                    [TeamSupportFacilityController::class, 'destroy']
+                );
+            });
+        });
+
+
+    // ========================================================
+    // LAYANAN: MANAJEMEN TUGAS DIGITAL
+    // ========================================================
+
+    Route::middleware(['service.enabled:MANAJEMEN_TUGAS'])
+        ->group(function () {
+
+            Route::prefix('task-management')->group(function () {
+
+                Route::get(
+                    '/boards',
+                    [BoardController::class, 'index']
+                );
+
+                Route::post(
+                    '/boards',
+                    [BoardController::class, 'store']
+                );
+
+                Route::get(
+                    '/boards/{id}',
+                    [BoardController::class, 'show']
+                );
+
+                Route::put(
+                    '/boards/{id}',
+                    [BoardController::class, 'update']
+                );
+
+                Route::delete(
+                    '/boards/{id}',
+                    [BoardController::class, 'destroy']
+                );
+
+                Route::post(
+                    '/boards/{boardId}/members/join',
+                    [BoardMemberController::class, 'join']
+                );
+
+                Route::get(
+                    '/boards/{boardId}/members',
+                    [BoardMemberController::class, 'members']
+                );
+
+                Route::get(
+                    '/boards/{boardId}/join-requests',
+                    [BoardMemberController::class, 'joinRequests']
+                );
+
+                Route::post(
+                    '/boards/{boardId}/members/{userId}/approve',
+                    [BoardMemberController::class, 'approve']
+                );
+
+                Route::post(
+                    '/boards/{boardId}/members/{userId}/reject',
+                    [BoardMemberController::class, 'reject']
+                );
+
+                Route::patch(
+                    '/boards/{boardId}/members/{userId}/permission',
+                    [BoardMemberController::class, 'updatePermission']
+                );
+
+                Route::delete(
+                    '/boards/{boardId}/members/leave',
+                    [BoardMemberController::class, 'leave']
+                );
+
+                Route::get(
+                    '/tasks',
+                    [TaskController::class, 'index']
+                );
+
+                Route::post(
+                    '/tasks',
+                    [TaskController::class, 'store']
+                );
+
+                Route::get(
+                    '/tasks/my',
+                    [TaskController::class, 'myTasks']
+                );
+
+                Route::get(
+                    '/tasks/{id}',
+                    [TaskController::class, 'show']
+                );
+
+                Route::put(
+                    '/tasks/{id}',
+                    [TaskController::class, 'update']
+                );
+
+                Route::patch(
+                    '/tasks/{id}/status',
+                    [TaskController::class, 'updateStatus']
+                );
+
+                Route::patch(
+                    '/tasks/{id}/approve',
+                    [TaskController::class, 'approve']
+                );
+
+                Route::delete(
+                    '/tasks/{id}',
+                    [TaskController::class, 'destroy']
+                );
+
+                Route::get(
+                    '/task-comments',
+                    [TaskCommentController::class, 'index']
+                );
+
+                Route::post(
+                    '/task-comments',
+                    [TaskCommentController::class, 'store']
+                );
+
+                Route::delete(
+                    '/task-comments/{id}',
+                    [TaskCommentController::class, 'destroy']
+                );
+
+                Route::get(
+                    '/task-activities',
+                    [TaskActivityController::class, 'index']
+                );
+
+                Route::get(
+                    '/dashboard',
+                    [DashboardController::class, 'index']
+                );
+
+                Route::get(
+                    '/my-tasks',
+                    [MyTaskController::class, 'index']
+                );
+
+                // Notifications
+                // Urutan penting: route khusus sebelum /{id}
+                Route::get(
+                    '/notifications',
+                    [NotificationController::class, 'index']
+                );
+
+                Route::get(
+                    '/notifications/unread-count',
+                    [NotificationController::class, 'unreadCount']
+                );
+
+                Route::patch(
+                    '/notifications/read-all',
+                    [NotificationController::class, 'markAllAsRead']
+                );
+
+                Route::patch(
+                    '/notifications/{id}/read',
+                    [NotificationController::class, 'markAsRead']
+                );
+
+                Route::delete(
+                    '/notifications/{id}',
+                    [NotificationController::class, 'destroy']
+                );
+            });
+        });
+
+
+    // ========================================================
+    // LAYANAN: MAGANG
+    // ========================================================
+
+    Route::middleware(['service.enabled:MAGANG'])
+        ->group(function () {
+
+            Route::post(
+                'magang/{id}/upload-nda',
+                [MagangController::class, 'uploadNda']
+            );
+
+            Route::apiResource(
+                'magang',
+                MagangController::class
+            )->except(['store']);
+        });
+
+
+    // ========================================================
+    // LAYANAN: ADMINISTRASI SURAT - BAGIAN 2
+    // ========================================================
+
+    Route::middleware(['service.enabled:ADMINISTRASI_SURAT'])
+        ->group(function () {
+
+            // Nota Dinas
+            Route::apiResource(
+                'nota-dinas',
+                NotaDinasController::class
+            );
+
+            Route::get(
+                'nota-dinas-export',
+                [NotaDinasController::class, 'export']
+            );
+
+            // Hasil Pentest
+            Route::apiResource(
+                'hasil-pentest',
+                \App\Http\Controllers\HasilPentestController::class
+            );
+
+            Route::get(
+                'hasil-pentest-export',
+                [\App\Http\Controllers\HasilPentestController::class, 'export']
+            );
+
+            // Kerentanan
+            Route::apiResource(
+                'kerentanan',
+                \App\Http\Controllers\KerentananController::class
+            );
+
+            Route::get(
+                'kerentanan-export',
+                [\App\Http\Controllers\KerentananController::class, 'export']
+            );
+        });
 });
-
-    Route::get('/spd/stats', [SpdProposalController::class, 'stats']);
-    // Route::apiResource('/spd', SpdProposalController::class);
-
-    Route::prefix('smartjabar')->group(function () {
-        Route::get('/export', [LaporanController::class, 'smartjabarExport']);
-        Route::get('/joined-apps', [JoinedAppController::class, 'index']);
-        Route::get('/joined-apps/create', [JoinedAppController::class, 'create']);
-        Route::post('/joined-apps', [JoinedAppController::class, 'store']);
-        Route::get('/joined-apps/{id}/edit', [JoinedAppController::class, 'edit']);
-        Route::put('/joined-apps/{id}', [JoinedAppController::class, 'update']);
-        Route::delete('/joined-apps/{id}', [JoinedAppController::class, 'destroy']);
-
-        Route::get('/stats', [UsageStatController::class, 'index']);
-        Route::get('/stats/create', [UsageStatController::class, 'create']);
-        Route::post('/stats', [UsageStatController::class, 'store']);
-        Route::get('/stats/{id}/edit', [UsageStatController::class, 'edit']);
-        Route::put('/stats/{id}', [UsageStatController::class, 'update']);
-        Route::delete('/stats/{id}', [UsageStatController::class, 'destroy']);
-    });
-
-    Route::prefix('spd')->group(function () {
-        Route::get('/', [SpdController::class, 'index']);
-        Route::get('/{id}', [SpdController::class, 'show']);
-        Route::post('/', [SpdController::class, 'store']);
-        Route::put('/{id}', [SpdController::class, 'update']);
-        Route::delete('/{id}', [SpdController::class, 'destroy']);
-        Route::post('/laporan', [SpdController::class, 'submitLaporan']);
-    });
-
-    Route::prefix('sadajabar')->group(function () {
-        Route::get('/export', [LaporanController::class, 'sadajabarExport']);
-        Route::get('/integrasi', [AppIntegrationController::class, 'index']);
-        Route::get('/integrasi/create', [AppIntegrationController::class, 'create']);
-        Route::post('/integrasi', [AppIntegrationController::class, 'store']);
-        Route::get('/integrasi/{id}/edit', [AppIntegrationController::class, 'edit']);
-        Route::put('/integrasi/{id}', [AppIntegrationController::class, 'update']);
-        Route::delete('/integrasi/{id}', [AppIntegrationController::class, 'destroy']);
-
-        Route::get('/enkripsi', [EncryptionStatController::class, 'index']);
-        Route::get('/enkripsi/create', [EncryptionStatController::class, 'create']);
-        Route::post('/enkripsi', [EncryptionStatController::class, 'store']);
-        Route::get('/enkripsi/{id}/edit', [EncryptionStatController::class, 'edit']);
-        Route::put('/enkripsi/{id}', [EncryptionStatController::class, 'update']);
-        Route::delete('/enkripsi/{id}', [EncryptionStatController::class, 'destroy']);
-    });
-
-    Route::prefix('rekayasa')->group(function () {
-        Route::get('/export', [LaporanController::class, 'rekayasaExport']);
-        Route::get('/application-replications/summary', [ApplicationReplicationController::class, 'summary']);
-        Route::get('/application-replications', [ApplicationReplicationController::class, 'index']);
-        Route::get('/application-replications/create', [ApplicationReplicationController::class, 'create']);
-        Route::post('/application-replications', [ApplicationReplicationController::class, 'store']);
-        Route::get('/application-replications/{id}/edit', [ApplicationReplicationController::class, 'edit']);
-        Route::put('/application-replications/{id}', [ApplicationReplicationController::class, 'update']);
-        Route::delete('/application-replications/{id}', [ApplicationReplicationController::class, 'destroy']);
-
-
-        Route::get('/mentoring-performances', [MentoringPerformanceController::class, 'index']);
-        Route::get('/mentoring-performances/create', [MentoringPerformanceController::class, 'create']);
-        Route::post('/mentoring-performances', [MentoringPerformanceController::class, 'store']);
-        Route::get('/mentoring-performances/{id}/edit', [MentoringPerformanceController::class, 'edit']);
-        Route::put('/mentoring-performances/{id}', [MentoringPerformanceController::class, 'update']);
-        Route::delete('/mentoring-performances/{id}', [MentoringPerformanceController::class, 'destroy']);
-    });
-
-    Route::prefix('intop')->group(function () {
-        Route::get('/export', [LaporanController::class, 'intopExport']);
-        Route::get('/integration-summaries', [IntegrationSummaryController::class, 'index']);
-        Route::get('/integration-summaries/create', [IntegrationSummaryController::class, 'create']);
-        Route::post('/integration-summaries', [IntegrationSummaryController::class, 'store']);
-        Route::get('/integration-summaries/{id}/edit', [IntegrationSummaryController::class, 'edit']);
-        Route::put('/integration-summaries/{id}', [IntegrationSummaryController::class, 'update']);
-        Route::delete('/integration-summaries/{id}', [IntegrationSummaryController::class, 'destroy']);
-
-        Route::get('/service-catalogs', [ServiceCatalogController::class, 'index']);
-        Route::get('/service-catalogs/create', [ServiceCatalogController::class, 'create']);
-        Route::post('/service-catalogs', [ServiceCatalogController::class, 'store']);
-        Route::get('/service-catalogs/{id}/edit', [ServiceCatalogController::class, 'edit']);
-        Route::put('/service-catalogs/{id}', [ServiceCatalogController::class, 'update']);
-        Route::delete('/service-catalogs/{id}', [ServiceCatalogController::class, 'destroy']);
-
-        Route::get('/intop-mandate-service-summaries', [IntopMandateServiceSummaryController::class, 'index']);
-        Route::get('/intop-mandate-service-summaries/create', [IntopMandateServiceSummaryController::class, 'create']);
-        Route::post('/intop-mandate-service-summaries', [IntopMandateServiceSummaryController::class, 'store']);
-        Route::get('/intop-mandate-service-summaries/{id}/edit', [IntopMandateServiceSummaryController::class, 'edit']);
-        Route::put('/intop-mandate-service-summaries/{id}', [IntopMandateServiceSummaryController::class, 'update']);
-        Route::delete('/intop-mandate-service-summaries/{id}', [IntopMandateServiceSummaryController::class, 'destroy']);
-    });
-
-    Route::prefix('sidebar')->group(function () {
-        Route::get('/export', [LaporanController::class, 'sidebarExport']);
-        Route::get('/document-stats', [DocumentStatController::class, 'index']);
-        Route::get('/document-stats/create', [DocumentStatController::class, 'create']);
-        Route::post('/document-stats', [DocumentStatController::class, 'store']);
-        Route::get('/document-stats/{id}/edit', [DocumentStatController::class, 'edit']);
-        Route::put('/document-stats/{id}', [DocumentStatController::class, 'update']);
-        Route::delete('/document-stats/{id}', [DocumentStatController::class, 'destroy']);
-
-        Route::get('/metrics', [MetricController::class, 'index']);
-        Route::get('/metrics/create', [MetricController::class, 'create']);
-        Route::post('/metrics', [MetricController::class, 'store']);
-        Route::get('/metrics/{id}/edit', [MetricController::class, 'edit']);
-        Route::put('/metrics/{id}', [MetricController::class, 'update']);
-        Route::delete('/metrics/{id}', [MetricController::class, 'destroy']);
-
-        Route::get('/opd-usages', [OpdUsageController::class, 'index']);
-        Route::get('/opd-usages/create', [OpdUsageController::class, 'create']);
-        Route::post('/opd-usages', [OpdUsageController::class, 'store']);
-        Route::get('/opd-usages/{id}/edit', [OpdUsageController::class, 'edit']);
-        Route::put('/opd-usages/{id}', [OpdUsageController::class, 'update']);
-        Route::delete('/opd-usages/{id}', [OpdUsageController::class, 'destroy']);
-    });
-
-    Route::prefix('appman')->group(function () {
-        Route::get('/export', [LaporanController::class, 'appmanExport']);
-        // KERENTAAN PADA APLIKASI PEMPROV JABAR
-        Route::get('/app-vulnerabilities', [AppVulnerabilityController::class, 'index']);
-        Route::get('/app-vulnerabilities/create', [AppVulnerabilityController::class, 'create']);
-        Route::post('/app-vulnerabilities', [AppVulnerabilityController::class, 'store']);
-        Route::get('/app-vulnerabilities/{id}/edit', [AppVulnerabilityController::class, 'edit']);
-        Route::put('/app-vulnerabilities/{id}', [AppVulnerabilityController::class, 'update']);
-        Route::delete('/app-vulnerabilities/{id}', [AppVulnerabilityController::class, 'destroy']);
-
-        // APLIKASI/LAYANAN YANG MENJADI TARGET PENGEMBANGAN
-        Route::get('/development-targets', [DevelopmentTargetController::class, 'index']);
-        Route::get('/development-targets/create', [DevelopmentTargetController::class, 'create']);
-        Route::post('/development-targets', [DevelopmentTargetController::class, 'store']);
-        Route::get('/development-targets/{id}/edit', [DevelopmentTargetController::class, 'edit']);
-        Route::put('/development-targets/{id}', [DevelopmentTargetController::class, 'update']);
-        Route::delete('/development-targets/{id}', [DevelopmentTargetController::class, 'destroy']);
-
-        // LAYANAN DRIVE JABAR
-        Route::get('/drive-jabar-stats', [DriveJabarStatController::class, 'index']);
-        Route::get('/drive-jabar-stats/create', [DriveJabarStatController::class, 'create']);
-        Route::post('/drive-jabar-stats', [DriveJabarStatController::class, 'store']);
-        Route::get('/drive-jabar-stats/{id}/edit', [DriveJabarStatController::class, 'edit']);
-        Route::put('/drive-jabar-stats/{id}', [DriveJabarStatController::class, 'update']);
-        Route::delete('/drive-jabar-stats/{id}', [DriveJabarStatController::class, 'destroy']);
-        
-        // LAYANAN PENGELOLAAN EMAIL
-        Route::get('/email-management-stats', [EmailManagementStatController::class, 'index']);
-        Route::get('/email-management-stats/create', [EmailManagementStatController::class, 'create']);
-        Route::post('/email-management-stats', [EmailManagementStatController::class, 'store']);
-        Route::get('/email-management-stats/{id}/edit', [EmailManagementStatController::class, 'edit']);
-        Route::put('/email-management-stats/{id}', [EmailManagementStatController::class, 'update']);
-        Route::delete('/email-management-stats/{id}', [EmailManagementStatController::class, 'destroy']);
-
-        // PEMETAAN INTEGRASI APLIKASI
-        Route::get('/integration-mappings', [IntegrationMappingController::class, 'index']);
-        Route::get('/integration-mappings/create', [IntegrationMappingController::class, 'create']);
-        Route::post('/integration-mappings', [IntegrationMappingController::class, 'store']);
-        Route::get('/integration-mappings/{id}/edit', [IntegrationMappingController::class, 'edit']);
-        Route::put('/integration-mappings/{id}', [IntegrationMappingController::class, 'update']);
-        Route::delete('/integration-mappings/{id}', [IntegrationMappingController::class, 'destroy']);
-
-        // PENDATAAN APLIKASI 2026 (BERDASARKAN KATALAPS)
-        Route::get('/inventory-stats', [InventoryStatController::class, 'index']);
-        Route::get('/inventory-stats/create', [InventoryStatController::class, 'create']);
-        Route::post('/inventory-stats', [InventoryStatController::class, 'store']);
-        Route::get('/inventory-stats/{id}/edit', [InventoryStatController::class, 'edit']);
-        Route::put('/inventory-stats/{id}', [InventoryStatController::class, 'update']);
-        Route::delete('/inventory-stats/{id}', [InventoryStatController::class, 'destroy']);
-
-        // KATALAPS KABUPATEN KOTA
-        Route::get('/katalaps-regencies', [KatalapsRegencyController::class, 'index']);
-        Route::get('/katalaps-regencies/create', [KatalapsRegencyController::class, 'create']);
-        Route::post('/katalaps-regencies', [KatalapsRegencyController::class, 'store']);
-        Route::get('/katalaps-regencies/{id}/edit', [KatalapsRegencyController::class, 'edit']);
-        Route::put('/katalaps-regencies/{id}', [KatalapsRegencyController::class, 'update']);
-        Route::delete('/katalaps-regencies/{id}', [KatalapsRegencyController::class, 'destroy']);
-
-        // FASILITASI DUKUNGAN TIM PADA PENGEMBANGAN APLIKASI PERANGKAT DAERAH (TOT) 
-        Route::get('/team-support-facilities', [TeamSupportFacilityController::class, 'index']);
-        Route::get('/team-support-facilities/create', [TeamSupportFacilityController::class, 'create']);
-        Route::post('/team-support-facilities', [TeamSupportFacilityController::class, 'store']);
-        Route::get('/team-support-facilities/{id}/edit', [TeamSupportFacilityController::class, 'edit']);
-        Route::put('/team-support-facilities/{id}', [TeamSupportFacilityController::class, 'update']);
-        Route::delete('/team-support-facilities/{id}', [TeamSupportFacilityController::class, 'destroy']);
-    });
-
-    Route::prefix('task-management')->group(function () {
-        Route::get('/boards', [BoardController::class, 'index']);
-        Route::post('/boards', [BoardController::class, 'store']);
-        Route::get('/boards/{id}', [BoardController::class, 'show']);
-        Route::put('/boards/{id}', [BoardController::class, 'update']);
-        Route::delete('/boards/{id}', [BoardController::class, 'destroy']);
-
-        Route::post('/boards/{boardId}/members/join', [BoardMemberController::class, 'join']);
-        Route::get('/boards/{boardId}/members', [BoardMemberController::class, 'members']);
-        Route::get('/boards/{boardId}/join-requests', [BoardMemberController::class, 'joinRequests']);
-        Route::post('/boards/{boardId}/members/{userId}/approve', [BoardMemberController::class, 'approve']);
-        Route::post('/boards/{boardId}/members/{userId}/reject', [BoardMemberController::class, 'reject']);
-        Route::delete('/boards/{boardId}/members/leave', [BoardMemberController::class, 'leave']);
-
-        Route::get('/tasks', [TaskController::class, 'index']);
-        Route::post('/tasks', [TaskController::class, 'store']);
-        Route::get('/tasks/my', [TaskController::class, 'myTasks']);
-        Route::get('/tasks/{id}', [TaskController::class, 'show']);
-        Route::put('/tasks/{id}', [TaskController::class, 'update']);
-        Route::patch('/tasks/{id}/status', [TaskController::class, 'updateStatus']);
-        Route::patch('/tasks/{id}/approve', [TaskController::class, 'approve']);
-        Route::delete('/tasks/{id}', [TaskController::class, 'destroy']);
-
-        Route::get('/task-comments', [TaskCommentController::class, 'index']);
-        Route::post('/task-comments', [TaskCommentController::class, 'store']);
-        Route::delete('/task-comments/{id}', [TaskCommentController::class, 'destroy']);
-
-        Route::get('/task-activities', [TaskActivityController::class, 'index']);
-        Route::get('/dashboard', [DashboardController::class, 'index']);
-        Route::get('/my-tasks', [MyTaskController::class, 'index']);
-
-        // Notifications — urutan penting: /read-all & /unread-count sebelum /{id}
-        Route::get('/notifications', [NotificationController::class, 'index']);
-        Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
-        Route::patch('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
-        Route::patch('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
-        Route::delete('/notifications/{id}', [NotificationController::class, 'destroy']);
-    });
-
-    // MAGANG
-    Route::post('magang/{id}/upload-nda', [MagangController::class, 'uploadNda']);
-    Route::apiResource('magang', MagangController::class)->except(['store']);
-
-    // NOTA DINAS
-    Route::apiResource('nota-dinas', NotaDinasController::class);
-    Route::get('nota-dinas-export', [NotaDinasController::class, 'export']);
-
-    // HASIL PENTEST
-    Route::apiResource('hasil-pentest', \App\Http\Controllers\HasilPentestController::class);
-    Route::get('hasil-pentest-export', [\App\Http\Controllers\HasilPentestController::class, 'export']);
-
-    // KERENTANAN
-    Route::apiResource('kerentanan', \App\Http\Controllers\KerentananController::class);
-    Route::get('kerentanan-export', [\App\Http\Controllers\KerentananController::class, 'export']);
-});
-

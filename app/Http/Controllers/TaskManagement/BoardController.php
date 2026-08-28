@@ -34,7 +34,7 @@ class BoardController extends Controller
 
             $userId = Auth::id();
             $isAdmin = Auth::user()->role === 'admin';
-
+            $isSuperAdmin = method_exists(Auth::user(), 'isAdminAptika') && Auth::user()->isAdminAptika();
 
             $boards = Board::query()
                 ->select('boards.*')
@@ -50,10 +50,24 @@ class BoardController extends Controller
                           ->orWhereNotNull('bm_access.id');
                     });
                 })
+                ->when($request->filled('bidang_id'), function ($q) use ($request) {
+                    $q->where('boards.bidang_id', $request->bidang_id);
+                })
+                ->when($request->filled('status'), function ($q) use ($request) {
+                    $q->where('boards.status', $request->status);
+                })
+                ->when($request->filled('search'), function ($q) use ($request) {
+                    $term = '%' . $request->search . '%';
+                    $q->where(function ($sub) use ($term) {
+                        $sub->where('boards.name', 'like', $term)
+                            ->orWhere('boards.description', 'like', $term);
+                    });
+                })
                 ->with([
-                    'pm:id,name',
+                    'pm:id,name,email',
+                    'bidang:id,name,code',
                     'members:id,board_id,user_id,role,membership_status',
-                    'members.user:id,name',
+                    'members.user:id,name,email',
                 ])
                 ->withCount('tasks')
                 ->orderByDesc('boards.created_at')
@@ -79,10 +93,11 @@ class BoardController extends Controller
     public function show(string $id)
     {
         try {
-            $board = Board::with([
-                'pm:id,name',
+            $board = Board::withoutGlobalScopes()->with([
+                'pm:id,name,email',
+                'bidang:id,name,code',
                 'members:id,board_id,user_id,membership_status',
-                'members.user:id,name',
+                'members.user:id,name,email',
             ])
                 ->withCount('tasks')
                 ->findOrFail($id);
@@ -128,12 +143,18 @@ class BoardController extends Controller
             'status' => 'nullable|in:active,completed,archived',
             'visibility' => 'nullable|in:private,public',
             'allow_join' => 'nullable|boolean',
+            'bidang_id' => 'nullable|exists:bidangs,id',
         ]);
 
         try {
             $board = DB::transaction(function () use ($validated) {
-                $userId = Auth::id();
+                $user = Auth::user();
+                $userId = $user->id;
                 $visibility = $this->resolveVisibility($validated);
+
+                $targetBidangId = isset($validated['bidang_id']) && !empty($validated['bidang_id'])
+                    ? $validated['bidang_id']
+                    : ($user->bidang_id ?? 1);
 
                 $board = Board::create([
                     'name' => $validated['name'],
@@ -143,6 +164,7 @@ class BoardController extends Controller
                     'end_date' => $validated['end_date'] ?? null,
                     'status' => $validated['status'] ?? 'active',
                     'visibility' => $visibility,
+                    'bidang_id' => $targetBidangId,
                 ]);
 
                 BoardMember::create([
@@ -160,9 +182,10 @@ class BoardController extends Controller
                 'success' => true,
                 'message' => 'Board berhasil dibuat.',
                 'data' => $board->load([
-                    'pm:id,name',
+                    'pm:id,name,email',
+                    'bidang:id,name,code',
                     'members:id,board_id,user_id,membership_status',
-                    'members.user:id,name',
+                    'members.user:id,name,email',
                 ]),
             ], 201);
         } catch (Exception $e) {
@@ -175,7 +198,7 @@ class BoardController extends Controller
     }
 
     /**
-     * Memperbarui board. Hanya PM yang boleh melakukan update.
+     * Memperbarui board. PM atau Admin dapat melakukan update.
      */
     public function update(Request $request, string $id)
     {
@@ -195,21 +218,26 @@ class BoardController extends Controller
             'status' => 'nullable|in:active,completed,archived',
             'visibility' => 'nullable|in:private,public',
             'allow_join' => 'nullable|boolean',
+            'bidang_id' => 'nullable|exists:bidangs,id',
         ]);
 
         try {
-            $board = Board::findOrFail($id);
+            $board = Board::withoutGlobalScopes()->findOrFail($id);
 
-            $isAdmin = Auth::user()->role === 'admin';
-            if ((int) $board->created_by !== Auth::id() && !$isAdmin) {
+            $user = Auth::user();
+            $isSuperAdmin = method_exists($user, 'isAdminAptika') && $user->isAdminAptika();
+            $isOwner = (int) $board->created_by === (int) $user->id;
+            $isBidangAdmin = $user->role === 'admin' && ((int) $user->bidang_id === (int) $board->bidang_id || empty($board->bidang_id));
+
+            if (!$isOwner && !$isSuperAdmin && !$isBidangAdmin) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Anda tidak berwenang mengubah board ini.',
-                    'errors' => 'Hanya PM yang dapat mengubah board.',
+                    'errors' => 'Hanya PM pembuat proyek atau Admin yang dapat mengubah board.',
                 ], 403);
             }
 
-            DB::transaction(function () use ($board, $validated) {
+            DB::transaction(function () use ($board, $validated, $user, $isSuperAdmin) {
                 $payload = [
                     'name' => $validated['name'] ?? $board->name,
                     'description' => array_key_exists('description', $validated) ? $validated['description'] : $board->description,
@@ -218,6 +246,10 @@ class BoardController extends Controller
                     'status' => array_key_exists('status', $validated) ? $validated['status'] : $board->status,
                     'visibility' => $this->resolveVisibility($validated, $board->visibility),
                 ];
+
+                if (($user->role === 'admin' || $isSuperAdmin) && array_key_exists('bidang_id', $validated) && !empty($validated['bidang_id'])) {
+                    $payload['bidang_id'] = $validated['bidang_id'];
+                }
 
                 $board->update($payload);
 
@@ -238,9 +270,10 @@ class BoardController extends Controller
                 'success' => true,
                 'message' => 'Board berhasil diperbarui.',
                 'data' => $board->fresh()->load([
-                    'pm:id,name',
+                    'pm:id,name,email',
+                    'bidang:id,name,code',
                     'members:id,board_id,user_id,membership_status',
-                    'members.user:id,name',
+                    'members.user:id,name,email',
                 ]),
             ], 200);
         } catch (ModelNotFoundException $e) {
@@ -259,7 +292,7 @@ class BoardController extends Controller
     }
 
     /**
-     * Menghapus board. Hanya PM yang boleh melakukan delete.
+     * Menghapus board. PM atau Admin dapat melakukan delete.
      */
     public function destroy(string $id)
     {
@@ -272,18 +305,32 @@ class BoardController extends Controller
         }
 
         try {
-            $board = Board::findOrFail($id);
+            $board = Board::withoutGlobalScopes()->findOrFail($id);
 
-            $isAdmin = Auth::user()->role === 'admin';
-            if ((int) $board->created_by !== Auth::id() && !$isAdmin) {
+            $user = Auth::user();
+            $isSuperAdmin = method_exists($user, 'isAdminAptika') && $user->isAdminAptika();
+            $isOwner = (int) $board->created_by === (int) $user->id;
+            $isBidangAdmin = $user->role === 'admin' && ((int) $user->bidang_id === (int) $board->bidang_id || empty($board->bidang_id));
+
+            if (!$isOwner && !$isSuperAdmin && !$isBidangAdmin) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Anda tidak berwenang menghapus board ini.',
-                    'errors' => 'Hanya PM yang dapat menghapus board.',
+                    'errors' => 'Hanya PM pembuat proyek atau Admin yang dapat menghapus board.',
                 ], 403);
             }
 
             DB::transaction(function () use ($board) {
+                // Delete related tasks and their comments/activities/attachments
+                $tasks = \App\Models\Task::withoutGlobalScopes()->where('board_id', $board->id)->get();
+                foreach ($tasks as $task) {
+                    \App\Models\TaskComment::where('task_id', $task->id)->delete();
+                    \App\Models\TaskActivity::where('task_id', $task->id)->delete();
+                    \App\Models\TaskAttachment::where('task_id', $task->id)->delete();
+                    $task->delete();
+                }
+                \App\Models\BoardMember::where('board_id', $board->id)->delete();
+                \App\Models\Notification::where('board_id', $board->id)->delete();
                 $board->delete();
             });
 

@@ -14,6 +14,7 @@ class BoardMember extends Model
         'user_id',
         'role',
         'membership_status',
+        'can_create_task',
         'joined_at',
         'approved_by',
         'approved_at',
@@ -22,6 +23,7 @@ class BoardMember extends Model
     protected $casts = [
         'joined_at' => 'datetime',
         'approved_at' => 'datetime',
+        'can_create_task' => 'boolean',
     ];
 
     public function board()

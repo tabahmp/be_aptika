@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToBidang;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -10,6 +11,7 @@ use App\Models\SpdPeserta;
 
 class DetailPerjalanan extends Model
 {
+    use BelongsToBidang;
     protected $table = 'detail_perjalanan';
 
     protected $fillable = [
@@ -24,6 +26,7 @@ class DetailPerjalanan extends Model
         'alat_angkutan',
         'deskripsi',
         'status',
+        'bidang_id',
     ];
 
     protected $casts = [

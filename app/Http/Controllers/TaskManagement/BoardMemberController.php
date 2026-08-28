@@ -425,6 +425,66 @@ class BoardMemberController extends Controller
     }
 
     /**
+     * Memperbarui izin pembuatan task untuk member tertentu. Hanya PM/Admin yang boleh melakukan.
+     */
+    public function updatePermission(Request $request, $boardId = null, $userId = null)
+    {
+        if (!Auth::check()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+                'errors' => 'User belum login.',
+            ], 401);
+        }
+
+        $boardId = $boardId ?? $request->input('board_id');
+        $userId = $userId ?? $request->input('user_id');
+
+        $validated = $request->validate([
+            'can_create_task' => 'required|boolean',
+        ]);
+
+        try {
+            $board = Board::findOrFail($boardId);
+
+            $isAdmin = Auth::user()->role === 'admin';
+            if ((int) $board->created_by !== Auth::id() && !$isAdmin) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Anda tidak berwenang mengubah izin anggota di board ini.',
+                    'errors' => 'Hanya PM atau Admin yang dapat mengubah izin.',
+                ], 403);
+            }
+
+            $member = BoardMember::where('board_id', $board->id)
+                ->where('user_id', $userId)
+                ->firstOrFail();
+
+            $member->update([
+                'can_create_task' => $validated['can_create_task'],
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Izin anggota berhasil diperbarui.',
+                'data' => $this->formatMember($member->fresh()->load('user')),
+            ], 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Data member atau board tidak ditemukan.',
+                'errors' => $e->getMessage(),
+            ], 404);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengubah izin anggota.',
+                'errors' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Memformat data membership agar status API konsisten.
      */
     private function formatMember(BoardMember $member): array
@@ -435,6 +495,7 @@ class BoardMemberController extends Controller
             'user_id' => $member->user_id,
             'role' => $member->role,
             'membership_status' => $member->membership_status === 'accepted' ? 'joined' : $member->membership_status,
+            'can_create_task' => (bool) $member->can_create_task,
             'joined_at' => $member->joined_at,
             'user' => $member->user,
         ];

@@ -13,8 +13,11 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            'active' => \App\Http\Middleware\CheckActiveUser::class,
-            'role' => \App\Http\Middleware\CheckRole::class,
+            'active'       => \App\Http\Middleware\CheckActiveUser::class,
+            'role'         => \App\Http\Middleware\CheckRole::class,
+            'admin.aptika' => \App\Http\Middleware\EnsureAdminAptika::class,
+            'service.enabled' => \App\Http\Middleware\EnsureServiceEnabled::class,
+            'super_admin'  => \App\Http\Middleware\CheckSuperAdmin::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
