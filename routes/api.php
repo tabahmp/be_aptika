@@ -82,14 +82,42 @@ Route::prefix('form-perubahan-it')->group(function () {
 // Public Health Check & Database Status
 Route::get('/system/db-status', function () {
     try {
+        // Tandai semua data eksisting yang bidang_id-nya masih NULL ke APTIKA (id: 3)
+        $tablesToSync = [
+            'users',
+            'boards',
+            'nota_dinas',
+            'hasil_pentests',
+            'kerentanans',
+            'permohonan_tis',
+            'magangs',
+            'detail_perjalanan',
+            'spds',
+        ];
+
+        $updatedCounts = [];
+        foreach ($tablesToSync as $table) {
+            if (\Illuminate\Support\Facades\Schema::hasTable($table) && \Illuminate\Support\Facades\Schema::hasColumn($table, 'bidang_id')) {
+                $affected = \Illuminate\Support\Facades\DB::table($table)->whereNull('bidang_id')->update(['bidang_id' => 3]);
+                $updatedCounts[$table] = $affected;
+            }
+        }
+
         $bidangsCount = \Illuminate\Support\Facades\DB::table('bidangs')->count();
         $servicesCount = \Illuminate\Support\Facades\DB::table('services')->count();
         $bidangServicesCount = \Illuminate\Support\Facades\DB::table('bidang_services')->count();
         
-        $usersNullBidang = \Illuminate\Support\Facades\DB::table('users')->whereNull('bidang_id')->count();
-        $boardsNullBidang = \Illuminate\Support\Facades\DB::table('boards')->whereNull('bidang_id')->count();
-        $notaDinasNullBidang = \Illuminate\Support\Facades\DB::table('nota_dinas')->whereNull('bidang_id')->count();
-        $magangNullBidang = \Illuminate\Support\Facades\DB::table('magangs')->whereNull('bidang_id')->count();
+        $nullCheck = [];
+        $isAllClean = true;
+        foreach ($tablesToSync as $table) {
+            if (\Illuminate\Support\Facades\Schema::hasTable($table) && \Illuminate\Support\Facades\Schema::hasColumn($table, 'bidang_id')) {
+                $cnt = \Illuminate\Support\Facades\DB::table($table)->whereNull('bidang_id')->count();
+                $nullCheck[$table . '_null_bidang'] = $cnt;
+                if ($cnt > 0) {
+                    $isAllClean = false;
+                }
+            }
+        }
 
         return response()->json([
             'success' => true,
@@ -99,13 +127,10 @@ Route::get('/system/db-status', function () {
                 'total_services' => $servicesCount,
                 'total_bidang_services' => $bidangServicesCount,
             ],
-            'data_tagged_aptika_check' => [
-                'users_null_bidang' => $usersNullBidang,
-                'boards_null_bidang' => $boardsNullBidang,
-                'nota_dinas_null_bidang' => $notaDinasNullBidang,
-                'magangs_null_bidang' => $magangNullBidang,
-                'is_all_clean' => ($usersNullBidang === 0 && $boardsNullBidang === 0 && $notaDinasNullBidang === 0 && $magangNullBidang === 0),
-            ],
+            'auto_tagged_to_aptika' => $updatedCounts,
+            'data_tagged_aptika_check' => array_merge($nullCheck, [
+                'is_all_clean' => $isAllClean,
+            ]),
             'bidangs' => \Illuminate\Support\Facades\DB::table('bidangs')->get(['id', 'code', 'name']),
         ]);
     } catch (\Throwable $e) {
