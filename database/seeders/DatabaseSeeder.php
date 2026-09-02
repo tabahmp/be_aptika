@@ -33,27 +33,10 @@ class DatabaseSeeder extends Seeder
             BidangServiceSeeder::class,
         ]);
 
-        // Seed Admin User
-        User::updateOrCreate(
-            ['email' => 'admin@aptika.com'],
-            [
-                'name' => 'Admin Aptika',
-                'password' => bcrypt('password'),
-                'role' => 'admin',
-                'is_active' => 1,
-            ]
-        );
-
-        // Seed Regular User
-        User::updateOrCreate(
-            ['email' => 'user@aptika.com'],
-            [
-                'name' => 'User Aptika',
-                'password' => bcrypt('password'),
-                'role' => 'user',
-                'is_active' => 1,
-            ]
-        );
+        // Seed Multi-Bidang Users (1 Admin & 2 User untuk setiap 7 Bidang)
+        $this->call([
+            MultiBidangUserSeeder::class,
+        ]);
 
         // Seed Project Data
         $this->call([
