@@ -88,7 +88,7 @@ class TaskController extends Controller
         }
 
         try {
-            $task = Task::with(['board', 'creator', 'assignee', 'comments.user', 'activities.user'])
+            $task = Task::with(['board', 'creator', 'assignee', 'comments.user', 'activities.user', 'attachments.uploader:id,name'])
                 ->findOrFail($id);
 
             $this->ensureBoardAccess($task->board_id);
@@ -277,11 +277,19 @@ class TaskController extends Controller
 
             $isPm = (int) $task->board->created_by === Auth::id();
             $isAdmin = Auth::user()->role === 'admin';
-            if (!$isPm && !$isAdmin && (int) $task->assigned_to !== Auth::id()) {
+            $isAssignee = (int) $task->assigned_to === Auth::id();
+
+            $isActivatedMember = BoardMember::where('board_id', $task->board_id)
+                ->where('user_id', Auth::id())
+                ->where('membership_status', 'accepted')
+                ->where('can_create_task', true)
+                ->exists();
+
+            if (!$isPm && !$isAdmin && !$isAssignee && !$isActivatedMember) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Anda tidak berwenang mengubah task ini.',
-                    'errors' => 'Staff hanya boleh mengedit task yang ditugaskan kepadanya.',
+                    'errors' => 'Hanya PM, Admin, Assignee, atau anggota yang diaktifkan yang dapat mengedit task.',
                 ], 403);
             }
 
@@ -382,7 +390,7 @@ class TaskController extends Controller
     }
 
     /**
-     * Menghapus task. Hanya PM yang boleh menghapus task.
+     * Menghapus task. PM, Admin, creator, atau user yang diaktifkan boleh menghapus task.
      */
     public function destroy(string $id)
     {
@@ -406,11 +414,20 @@ class TaskController extends Controller
             }
 
             $isAdmin = Auth::user()->role === 'admin';
-            if ((int) $task->board->created_by !== Auth::id() && !$isAdmin) {
+            $isPm = (int) $task->board->created_by === Auth::id();
+            $isCreator = (int) $task->created_by === Auth::id();
+
+            $isActivatedMember = BoardMember::where('board_id', $task->board_id)
+                ->where('user_id', Auth::id())
+                ->where('membership_status', 'accepted')
+                ->where('can_create_task', true)
+                ->exists();
+
+            if (!$isPm && !$isAdmin && !$isCreator && !$isActivatedMember) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Anda tidak berwenang menghapus task ini.',
-                    'errors' => 'Hanya PM yang dapat menghapus task.',
+                    'errors' => 'Hanya PM, Admin, pembuat tugas, atau anggota yang diaktifkan yang dapat menghapus tugas.',
                 ], 403);
             }
 
