@@ -45,6 +45,7 @@ use App\Http\Controllers\Appman\TeamSupportFacilityController;
 use App\Http\Controllers\TaskManagement\BoardController;
 use App\Http\Controllers\TaskManagement\BoardMemberController;
 use App\Http\Controllers\TaskManagement\TaskController;
+use App\Http\Controllers\TaskManagement\TaskAttachmentController;
 use App\Http\Controllers\TaskManagement\TaskCommentController;
 use App\Http\Controllers\TaskManagement\TaskActivityController;
 use App\Http\Controllers\TaskManagement\DashboardController;
@@ -1278,6 +1279,21 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
                 Route::delete(
                     '/task-comments/{id}',
                     [TaskCommentController::class, 'destroy']
+                );
+
+                Route::get(
+                    '/task-attachments',
+                    [TaskAttachmentController::class, 'index']
+                );
+
+                Route::post(
+                    '/task-attachments',
+                    [TaskAttachmentController::class, 'store']
+                );
+
+                Route::delete(
+                    '/task-attachments/{id}',
+                    [TaskAttachmentController::class, 'destroy']
                 );
 
                 Route::get(
