@@ -359,13 +359,6 @@ class SmkiSoftwareStandarController extends Controller
 
         $items = $query->get();
 
-        if ($items->isEmpty()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Tidak ada data software standar yang dapat diekspor.',
-            ], 404);
-        }
-
         // Siapkan opsi header dokumen dari parameter request
         $options = [];
         if ($request->filled('no_dokumen')) {
@@ -378,11 +371,18 @@ class SmkiSoftwareStandarController extends Controller
             $options['tanggal_berlaku'] = $request->input('tanggal_berlaku');
         }
 
-        $filePath = $this->docxService->generateDocx($items, $options);
-        $filename = 'FR-017_Daftar_Software_Standar_' . date('Ymd_His') . '.docx';
+        try {
+            $filePath = $this->docxService->generateDocx($items, $options);
+            $filename = 'FR-017_Daftar_Software_Standar_' . date('Ymd_His') . '.docx';
 
-        return response()->download($filePath, $filename, [
-            'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        ])->deleteFileAfterSend(true);
+            return response()->download($filePath, $filename, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            ])->deleteFileAfterSend(true);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menghasilkan dokumen FR-017: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 }

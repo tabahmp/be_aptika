@@ -16,9 +16,12 @@ class SmkiDocxService
     public static function getTemplatePath(): string
     {
         $possiblePaths = [
+            resource_path('templates/FR-017 Daftar Software Standar.docx'),
+            base_path('resources/templates/FR-017 Daftar Software Standar.docx'),
+            storage_path('app/templates/FR-017 Daftar Software Standar.docx'),
+            base_path('storage/app/templates/FR-017 Daftar Software Standar.docx'),
             base_path('../FR-017 Daftar Software Standar.docx'),
             base_path('FR-017 Daftar Software Standar.docx'),
-            storage_path('app/templates/FR-017 Daftar Software Standar.docx'),
             'D:/1. KULIAH/NEW APTIKA TOOLS/FR-017 Daftar Software Standar.docx',
             'D:\\1. KULIAH\\NEW APTIKA TOOLS\\FR-017 Daftar Software Standar.docx',
         ];
@@ -29,7 +32,7 @@ class SmkiDocxService
             }
         }
 
-        throw new Exception("Template dokumen FR-017 Daftar Software Standar.docx tidak ditemukan.");
+        throw new Exception("Template dokumen FR-017 Daftar Software Standar.docx tidak ditemukan di server.");
     }
 
     /**
@@ -178,6 +181,17 @@ class SmkiDocxService
 
                 $dataTable->appendChild($newRow);
             }
+        }
+
+        // Jika data kosong, masukkan 1 baris placeholder agar dokumen tetap rapi dan valid
+        if (empty($groups)) {
+            $newRow = $templateRow->cloneNode(true);
+            $cells  = $xpath->query('w:tc', $newRow);
+            $placeholderData = ['1.', '-', '-', '-', '-', '-'];
+            for ($cIdx = 0; $cIdx < count($placeholderData) && $cIdx < $cells->length; $cIdx++) {
+                $this->writeCellText($dom, $xpath, $cells->item($cIdx), $placeholderData[$cIdx]);
+            }
+            $dataTable->appendChild($newRow);
         }
 
         // Simpan kembali xml ke dalam zip
