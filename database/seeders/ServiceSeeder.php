@@ -15,6 +15,7 @@ class ServiceSeeder extends Seeder
             ['id' => 2, 'parent_id' => null, 'code' => 'IKI_REPORT',         'name' => 'IKI Report',         'description' => 'Induk Laporan Kinerja Indikator Aplikasi'],
             ['id' => 3, 'parent_id' => null, 'code' => 'MANAJEMEN_TUGAS',    'name' => 'Manajemen Tugas Digital', 'description' => 'Scrum/Kanban Board & Task Management'],
             ['id' => 4, 'parent_id' => null, 'code' => 'MAGANG',             'name' => 'Magang',             'description' => 'Pendaftaran, Presensi, NDA, & Sertifikat Magang'],
+            ['id' => 16, 'parent_id' => null, 'code' => 'SMKI',              'name' => 'SMKI',               'description' => 'Surat Manajemen Keamanan Informasi'],
 
             // Sub-Layanan Jenis Surat (under ADMINISTRASI_SURAT)
             ['id' => 5, 'parent_id' => 1, 'code' => 'SURAT_NOTA_DINAS',    'name' => 'Nota Dinas',              'description' => 'Modul Pengelolaan Nota Dinas'],

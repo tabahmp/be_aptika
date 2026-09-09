@@ -1400,4 +1400,17 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
                 [\App\Http\Controllers\KerentananController::class, 'export']
             );
         });
+
+    // ========================================================
+    // LAYANAN: SMKI - MANAJEMEN DAFTAR SOFTWARE STANDAR
+    // ========================================================
+
+    Route::middleware(['service.enabled:SMKI'])
+        ->prefix('smki')
+        ->group(function () {
+            Route::get('software-standar/lookup', [\App\Http\Controllers\Smki\SmkiSoftwareStandarController::class, 'lookup']);
+            Route::get('software-standar/export-docx', [\App\Http\Controllers\Smki\SmkiSoftwareStandarController::class, 'exportDocx']);
+            Route::apiResource('software-standar', \App\Http\Controllers\Smki\SmkiSoftwareStandarController::class);
+        });
 });
+

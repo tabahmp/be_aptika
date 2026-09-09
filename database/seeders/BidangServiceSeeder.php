@@ -12,8 +12,8 @@ class BidangServiceSeeder extends Seeder
         // 7 Bidang (1 s/d 7)
         $bidangIds = [1, 2, 3, 4, 5, 6, 7];
 
-        // 15 Services & Sub-Services (1 s/d 15)
-        $serviceIds = range(1, 15);
+        // 16 Services & Sub-Services (1 s/d 16)
+        $serviceIds = range(1, 16);
 
         // Service IDs for IKI Report (2, 10, 11, 12, 13, 14, 15)
         $ikiServiceIds = [2, 10, 11, 12, 13, 14, 15];
