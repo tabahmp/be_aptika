@@ -111,13 +111,12 @@ class SmkiSoftwareStandarController extends Controller
      */
     public function lookup()
     {
-        // Pastikan master kategori dasar ada (Lisensi, Open source, In house, Freeware)
+        // Pastikan master kategori dasar ada (Lisensi, Open source, In house)
         if (SmkiKategori::count() === 0) {
             $defaultKategoris = [
                 ['nama_kategori' => 'Lisensi', 'keterangan' => 'Software berbayar/lisensi komersial resmi'],
                 ['nama_kategori' => 'Open source', 'keterangan' => 'Software sumber terbuka dengan lisensi publik'],
                 ['nama_kategori' => 'In house', 'keterangan' => 'Software/aplikasi mandiri hasil pengembangan internal organisasi'],
-                ['nama_kategori' => 'Freeware', 'keterangan' => 'Software gratis untuk penggunaan operasional'],
             ];
             foreach ($defaultKategoris as $k) {
                 SmkiKategori::firstOrCreate(['nama_kategori' => $k['nama_kategori']], $k);
@@ -154,7 +153,7 @@ class SmkiSoftwareStandarController extends Controller
         return response()->json([
             'success' => true,
             'data'    => [
-                'kategoris'         => SmkiKategori::orderBy('id')->get(),
+                'kategoris'         => SmkiKategori::where('nama_kategori', '!=', 'Freeware')->orderBy('id')->get(),
                 'tipe_softwares'    => SmkiTipeSoftware::orderBy('nama_tipe_software')->get(),
                 'penyedia_barangs'  => SmkiPenyediaBarang::orderBy('nama_penyedia_barang')->get(),
                 'nomor_terpakai'    => $nomorTerpakai,
@@ -171,8 +170,7 @@ class SmkiSoftwareStandarController extends Controller
             'nomor_kelompok'      => 'nullable|integer|min:1',
             'nama_software'       => 'required|string|max:255',
             'versi'               => 'required|string|max:100',
-            'kategori_id'         => 'nullable|exists:smki_kategoris,id',
-            'kategori_baru'       => 'nullable|string|max:100',
+            'kategori_id'         => 'required|exists:smki_kategoris,id',
             'tipe_software_id'    => 'nullable|exists:smki_tipe_softwares,id',
             'tipe_software_baru'  => 'nullable|string|max:100',
             'penyedia_barang_id'  => 'nullable|exists:smki_penyedia_barangs,id',
@@ -180,28 +178,12 @@ class SmkiSoftwareStandarController extends Controller
             'keterangan'          => 'nullable|string',
         ]);
 
-        // Validasi wajib pilih atau input baru untuk Kategori
-        if (empty($validated['kategori_id']) && empty($validated['kategori_baru'])) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Kategori software wajib dipilih atau diinput baru.',
-            ], 422);
-        }
-
         // Validasi wajib pilih atau input baru untuk Tipe Software
         if (empty($validated['tipe_software_id']) && empty($validated['tipe_software_baru'])) {
             return response()->json([
                 'success' => false,
                 'message' => 'Tipe software wajib dipilih atau diinput baru.',
             ], 422);
-        }
-
-        // Jika user menginput kategori baru
-        if (empty($validated['kategori_id']) && !empty($validated['kategori_baru'])) {
-            $kat = SmkiKategori::firstOrCreate([
-                'nama_kategori' => trim($validated['kategori_baru']),
-            ]);
-            $validated['kategori_id'] = $kat->id;
         }
 
         // Jika user menginput tipe software baru
@@ -220,7 +202,7 @@ class SmkiSoftwareStandarController extends Controller
             $validated['penyedia_barang_id'] = $vendor->id;
         }
 
-        unset($validated['kategori_baru'], $validated['tipe_software_baru'], $validated['penyedia_baru']);
+        unset($validated['tipe_software_baru'], $validated['penyedia_baru']);
         $validated['user_id'] = auth()->id() ?? 1;
 
         $software = SmkiSoftwareStandar::create($validated);
@@ -258,21 +240,13 @@ class SmkiSoftwareStandarController extends Controller
             'nomor_kelompok'      => 'nullable|integer|min:1',
             'nama_software'       => 'sometimes|required|string|max:255',
             'versi'               => 'sometimes|required|string|max:100',
-            'kategori_id'         => 'nullable|exists:smki_kategoris,id',
-            'kategori_baru'       => 'nullable|string|max:100',
+            'kategori_id'         => 'sometimes|required|exists:smki_kategoris,id',
             'tipe_software_id'    => 'nullable|exists:smki_tipe_softwares,id',
             'tipe_software_baru'  => 'nullable|string|max:100',
             'penyedia_barang_id'  => 'nullable|exists:smki_penyedia_barangs,id',
             'penyedia_baru'       => 'nullable|string|max:255',
             'keterangan'          => 'nullable|string',
         ]);
-
-        if (empty($validated['kategori_id']) && !empty($validated['kategori_baru'])) {
-            $kat = SmkiKategori::firstOrCreate([
-                'nama_kategori' => trim($validated['kategori_baru']),
-            ]);
-            $validated['kategori_id'] = $kat->id;
-        }
 
         if (empty($validated['tipe_software_id']) && !empty($validated['tipe_software_baru'])) {
             $tipe = SmkiTipeSoftware::firstOrCreate([
@@ -288,7 +262,7 @@ class SmkiSoftwareStandarController extends Controller
             $validated['penyedia_barang_id'] = $vendor->id;
         }
 
-        unset($validated['kategori_baru'], $validated['tipe_software_baru'], $validated['penyedia_baru']);
+        unset($validated['tipe_software_baru'], $validated['penyedia_baru']);
 
         $software->update($validated);
         $software->load(['kategori', 'tipeSoftware', 'penyediaBarang', 'user:id,name,email']);

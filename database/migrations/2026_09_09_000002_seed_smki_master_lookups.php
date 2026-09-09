@@ -24,7 +24,6 @@ return new class extends Migration
                 ['nama_kategori' => 'Lisensi', 'keterangan' => 'Software berbayar/lisensi komersial resmi'],
                 ['nama_kategori' => 'Open source', 'keterangan' => 'Software sumber terbuka dengan lisensi publik'],
                 ['nama_kategori' => 'In house', 'keterangan' => 'Software/aplikasi mandiri hasil pengembangan internal organisasi'],
-                ['nama_kategori' => 'Freeware', 'keterangan' => 'Software gratis untuk penggunaan operasional'],
             ];
 
             foreach ($kategoris as $k) {
