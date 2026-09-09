@@ -288,7 +288,15 @@ class SmkiDocxService
         $textNodes = $xpath->query('.//w:t', $cell);
 
         if ($textNodes->length > 0) {
-            $textNodes->item(0)->nodeValue = $text;
+            // Gunakan createTextNode agar karakter spesial XML (&, <, >, dll)
+            // di-escape otomatis (mencegah error "unterminated entity reference")
+            $wt = $textNodes->item(0);
+            // Hapus semua child text node lama
+            while ($wt->firstChild) {
+                $wt->removeChild($wt->firstChild);
+            }
+            $wt->appendChild($dom->createTextNode($text));
+
             // Hapus node w:t berlebih di cell tersebut
             for ($k = 1; $k < $textNodes->length; $k++) {
                 $tn = $textNodes->item($k);
@@ -311,7 +319,7 @@ class SmkiDocxService
                     $this->applyRunFont($dom, $xpath, $r, $fontOptions);
                 }
                 $t = $dom->createElement('w:t');
-                $t->nodeValue = $text;
+                $t->appendChild($dom->createTextNode($text));
                 $r->appendChild($t);
                 $p->appendChild($r);
             }
