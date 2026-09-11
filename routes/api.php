@@ -1412,17 +1412,29 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
             Route::get('software-standar/export-docx', [\App\Http\Controllers\Smki\SmkiSoftwareStandarController::class, 'exportDocx']);
             Route::apiResource('software-standar', \App\Http\Controllers\Smki\SmkiSoftwareStandarController::class);
 
-            // Daftar Aset TI
-            Route::get('daftar-aset-ti/lookup', [\App\Http\Controllers\DaftarAsetTiController::class, 'lookup']);
-            Route::get('daftar-aset-ti/export-excel', [\App\Http\Controllers\DaftarAsetTiController::class, 'exportExcel']);
-            Route::apiResource('daftar-aset-ti', \App\Http\Controllers\DaftarAsetTiController::class);
+            // Daftar Aset TI (dalam prefix smki - gunakan nama eksplisit agar tidak konflik)
+            Route::get('daftar-aset-ti/lookup', [\App\Http\Controllers\DaftarAsetTiController::class, 'lookup'])
+                ->name('smki.daftar-aset-ti.lookup');
+            Route::get('daftar-aset-ti/export-excel', [\App\Http\Controllers\DaftarAsetTiController::class, 'exportExcel'])
+                ->name('smki.daftar-aset-ti.export-excel');
+            Route::apiResource('daftar-aset-ti', \App\Http\Controllers\DaftarAsetTiController::class)
+                ->names([
+                    'index'   => 'smki.daftar-aset-ti.index',
+                    'store'   => 'smki.daftar-aset-ti.store',
+                    'show'    => 'smki.daftar-aset-ti.show',
+                    'update'  => 'smki.daftar-aset-ti.update',
+                    'destroy' => 'smki.daftar-aset-ti.destroy',
+                ]);
         });
 
     // ========================================================
     // LAYANAN: INVENTARISASI DAFTAR ASET TI (BIDANG APTIKA)
+    // Route standalone (tanpa prefix smki) - memiliki nama default apiResource
     // ========================================================
-    Route::get('daftar-aset-ti/lookup', [\App\Http\Controllers\DaftarAsetTiController::class, 'lookup']);
-    Route::get('daftar-aset-ti/export-excel', [\App\Http\Controllers\DaftarAsetTiController::class, 'exportExcel']);
+    Route::get('daftar-aset-ti/lookup', [\App\Http\Controllers\DaftarAsetTiController::class, 'lookup'])
+        ->name('daftar-aset-ti.lookup');
+    Route::get('daftar-aset-ti/export-excel', [\App\Http\Controllers\DaftarAsetTiController::class, 'exportExcel'])
+        ->name('daftar-aset-ti.export-excel');
     Route::apiResource('daftar-aset-ti', \App\Http\Controllers\DaftarAsetTiController::class);
 });
 
