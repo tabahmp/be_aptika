@@ -1402,7 +1402,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         });
 
     // ========================================================
-    // LAYANAN: SMKI - MANAJEMEN DAFTAR SOFTWARE STANDAR
+    // LAYANAN: SMKI - MANAJEMEN DAFTAR SOFTWARE STANDAR & ASET TI
     // ========================================================
 
     Route::middleware(['service.enabled:SMKI'])
@@ -1411,6 +1411,19 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
             Route::get('software-standar/lookup', [\App\Http\Controllers\Smki\SmkiSoftwareStandarController::class, 'lookup']);
             Route::get('software-standar/export-docx', [\App\Http\Controllers\Smki\SmkiSoftwareStandarController::class, 'exportDocx']);
             Route::apiResource('software-standar', \App\Http\Controllers\Smki\SmkiSoftwareStandarController::class);
+
+            // Daftar Aset TI
+            Route::get('daftar-aset-ti/lookup', [\App\Http\Controllers\DaftarAsetTiController::class, 'lookup']);
+            Route::get('daftar-aset-ti/export-excel', [\App\Http\Controllers\DaftarAsetTiController::class, 'exportExcel']);
+            Route::apiResource('daftar-aset-ti', \App\Http\Controllers\DaftarAsetTiController::class);
         });
+
+    // ========================================================
+    // LAYANAN: INVENTARISASI DAFTAR ASET TI (BIDANG APTIKA)
+    // ========================================================
+    Route::get('daftar-aset-ti/lookup', [\App\Http\Controllers\DaftarAsetTiController::class, 'lookup']);
+    Route::get('daftar-aset-ti/export-excel', [\App\Http\Controllers\DaftarAsetTiController::class, 'exportExcel']);
+    Route::apiResource('daftar-aset-ti', \App\Http\Controllers\DaftarAsetTiController::class);
 });
+
 
