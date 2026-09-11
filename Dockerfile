@@ -44,4 +44,4 @@ RUN chown -R www-data:www-data \
 
 EXPOSE 8080
 
-CMD ["sh", "-c", "php artisan migrate --force && php artisan storage:link && php artisan config:cache && php artisan route:cache && php artisan serve --host=0.0.0.0 --port=8080"]
+CMD ["sh", "-c", "php artisan migrate --force && php artisan db:seed --class=ProductionDaftarAsetTiSeeder --force && php artisan storage:link && php artisan config:cache && php artisan route:cache && php artisan serve --host=0.0.0.0 --port=8080"]

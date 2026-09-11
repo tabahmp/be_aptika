@@ -24,6 +24,10 @@ class ProductionDaftarAsetTiSeeder extends Seeder
      */
     public function run(): void
     {
+        // Langkah 1: Isi semua master data lookup terlebih dahulu
+        // agar dropdown form tidak kosong di environment produksi
+        $this->call(AsetTiMasterSeeder::class);
+
         // 3 Data Spesifik Resmi untuk Inisialisasi Awal
         $targetAssets = [
             [
@@ -85,15 +89,19 @@ class ProductionDaftarAsetTiSeeder extends Seeder
             ],
         ];
 
-        // Bersihkan data lama di tabel daftar_aset_tis saja secara aman
-        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
-        DaftarAsetTi::truncate();
-        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
-
         DB::transaction(function () use ($targetAssets) {
             $bidangId = 3; // Bidang Aplikasi Informatika (APTIKA)
 
             foreach ($targetAssets as $row) {
+                // Cek apakah data spesifik ini sudah ada agar tidak duplikat saat container restart
+                $alreadyExists = DaftarAsetTi::where('kode', $row['kode'])
+                    ->where('nama_aset', $row['nama_aset'])
+                    ->exists();
+
+                if ($alreadyExists) {
+                    continue;
+                }
+
                 $namaAsetId = AsetTiNama::firstOrCreate(['nama_aset' => $row['nama_aset']])->id;
                 $klasifikasiId = AsetTiKlasifikasi::firstOrCreate(['nama_klasifikasi' => $row['klasifikasi']])->id;
                 $jenisId = AsetTiJenis::firstOrCreate(['nama_jenis' => $row['jenis']])->id;
