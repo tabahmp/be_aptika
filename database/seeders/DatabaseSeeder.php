@@ -41,6 +41,7 @@ class DatabaseSeeder extends Seeder
         // Seed Project Data
         $this->call([
             ProjectDataSeeder::class,
+            BeritaAcaraSeeder::class,
         ]);
     }
 }
