@@ -2,14 +2,13 @@
 
 namespace App\Models;
 
-use App\Traits\BelongsToBidang;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class SmkiSoftwareStandar extends Model
 {
-    use BelongsToBidang, SoftDeletes;
+    use SoftDeletes;
 
     protected $table = 'smki_software_standars';
 

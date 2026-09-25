@@ -42,5 +42,13 @@ class DatabaseSeeder extends Seeder
         $this->call([
             ProjectDataSeeder::class,
         ]);
+
+        // Seed Aset TI & SMKI
+        $this->call([
+            AsetTiMasterSeeder::class,
+            DaftarAsetTiSeeder::class,
+            SmkiSoftwareStandarSeeder::class,
+            SmkiFormulirHardeningSeeder::class,
+        ]);
     }
 }
