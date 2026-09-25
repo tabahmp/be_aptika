@@ -161,12 +161,6 @@ class SmkiDaftarRekamanController extends Controller
      */
     public function store(Request $request)
     {
-        if ($request->user()?->role !== 'admin' && !$request->user()?->isAdminAptika()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Aksi ditolak. Hanya Admin yang memiliki izin menambah data rekaman.',
-            ], 403);
-        }
         $validated = $request->validate([
             'judul'          => 'required|string|max:255',
             'klasifikasi_id' => 'nullable|exists:smki_rekaman_klasifikasis,id',
