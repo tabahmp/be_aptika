@@ -208,7 +208,61 @@ Contoh response:
 }
 ```
 
+```
+
+---
+
+## 9. SMKI - Berita Acara Penghancuran Media (FR014-SMKI)
+**[Membutuhkan Bearer Token]**
+
+Prefix: `/api/smki/berita-acara`
+
+Standar formulir FR014-SMKI untuk pencatatan resmi pemusnahan media penyimpanan, harddisk, flashdisk, server, dan aset perangkat keras lainnya.
+
+### Endpoints
+- `GET /api/smki/berita-acara` : Mendapatkan daftar berita acara dengan paginasi, live search, dan ringkasan KPI (Total Data, Data Hari Ini, Data Dihapus).
+  - Query parameters:
+    - `search`: string (cari nomor dokumen, pelaksana, pihak diketahui, alasan, atau perangkat media)
+    - `date_from`: string (filter tanggal mulai `YYYY-MM-DD`)
+    - `date_to`: string (filter tanggal selesai `YYYY-MM-DD`)
+    - `page`: int (halaman saat ini)
+    - `per_page`: int (jumlah per halaman, default: 10)
+- `GET /api/smki/berita-acara/lookup` : Master data untuk dropdown pengguna/pegawai dan rekomendasi nomor dokumen otomatis (misal: `BA-001/SMKI/2026`).
+- `POST /api/smki/berita-acara` : Menyimpan dokumen berita acara baru beserta array rincian media perangkat (`detail_media`).
+  - **Body (JSON)**:
+    ```json
+    {
+      "nomor_dokumen": "BA-001/SMKI/2025",
+      "tanggal_pelaksanaan": "2025-09-12",
+      "alasan_penghancuran": "Media/perangkat mengalami kerusakan dan data tidak diperlukan.",
+      "id_pelaksana": 1,
+      "id_diketahui": 2,
+      "nama_pelaksana": "Ahmad Fauzi",
+      "nama_diketahui": "Budi Santoso",
+      "detail_media": [
+        {
+          "nama_perangkat": "Hard Disk Internal",
+          "spesifikasi": "Seagate Barracuda 1 TB",
+          "jenis_media": "Storage",
+          "serial_number": "SG-2021-001",
+          "jumlah": 2,
+          "satuan": "Unit",
+          "keterangan": "Rusak dan tidak dapat digunakan"
+        }
+      ]
+    }
+    ```
+- `GET /api/smki/berita-acara/{id}` : Mengambil data rincian berita acara spesifik beserta list media.
+- `PUT /api/smki/berita-acara/{id}` : Memperbarui data berita acara dan menyinkronkan array rincian media.
+- `DELETE /api/smki/berita-acara/{id}` : Menghapus berita acara (soft-delete dengan cascading child media).
+- `GET /api/smki/berita-acara/export-docx` atau `GET /api/smki/berita-acara/{id}/export-docx` : Menghasilkan file dokumen Word (.docx) resmi yang telah terformat sesuai template standar DISKOMINFO PROVINSI JAWA BARAT "FR014-SMKI".
+  - Query parameters opsional:
+    - `no_dokumen`: string
+    - `no_revisi`: string (default: 1.0)
+    - `tanggal_berlaku`: string
+
 ---
 
 > [!NOTE]
 > Semua route yang tidak menggunakan `GET` (seperti `POST`, `PUT`, `DELETE`) harus mengirimkan data dalam format `application/json` (Gunakan Header `Content-Type: application/json` dan `Accept: application/json`).
+

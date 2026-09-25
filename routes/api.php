@@ -1425,6 +1425,23 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
                     'update'  => 'smki.daftar-rekaman.update',
                     'destroy' => 'smki.daftar-rekaman.destroy',
                 ]);
+
+            // Berita Acara Penghancuran Media (FR014-SMKI)
+            Route::get('berita-acara/lookup', [\App\Http\Controllers\Smki\SmkiBeritaAcaraController::class, 'lookup'])
+                ->name('smki.berita-acara.lookup');
+            Route::get('berita-acara/export-docx', [\App\Http\Controllers\Smki\SmkiBeritaAcaraController::class, 'exportDocx'])
+                ->name('smki.berita-acara.export-docx-all');
+            Route::get('berita-acara/{id}/export-docx', [\App\Http\Controllers\Smki\SmkiBeritaAcaraController::class, 'exportDocx'])
+                ->name('smki.berita-acara.export-docx-single');
+            Route::apiResource('berita-acara', \App\Http\Controllers\Smki\SmkiBeritaAcaraController::class)
+                ->names([
+                    'index'   => 'smki.berita-acara.index',
+                    'store'   => 'smki.berita-acara.store',
+                    'show'    => 'smki.berita-acara.show',
+                    'update'  => 'smki.berita-acara.update',
+                    'destroy' => 'smki.berita-acara.destroy',
+                ]);
+            // Daftar Aset TI (dalam prefix smki)
             Route::get('daftar-aset-ti/lookup', [\App\Http\Controllers\DaftarAsetTiController::class, 'lookup'])
                 ->name('smki.daftar-aset-ti.lookup');
             Route::get('daftar-aset-ti/export-excel', [\App\Http\Controllers\DaftarAsetTiController::class, 'exportExcel'])
