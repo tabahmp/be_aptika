@@ -1440,6 +1440,20 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
                     'update'  => 'smki.daftar-aset-ti.update',
                     'destroy' => 'smki.daftar-aset-ti.destroy',
                 ]);
+
+            // Formulir Hardening Pengecekan Aset (FR-047)
+            Route::get('formulir-hardening/lookup', [\App\Http\Controllers\Smki\SmkiFormulirHardeningController::class, 'lookup'])
+                ->name('smki.formulir-hardening.lookup');
+            Route::get('formulir-hardening/{id}/export-docx', [\App\Http\Controllers\Smki\SmkiFormulirHardeningController::class, 'exportDocx'])
+                ->name('smki.formulir-hardening.export-docx');
+            Route::apiResource('formulir-hardening', \App\Http\Controllers\Smki\SmkiFormulirHardeningController::class)
+                ->names([
+                    'index'   => 'smki.formulir-hardening.index',
+                    'store'   => 'smki.formulir-hardening.store',
+                    'show'    => 'smki.formulir-hardening.show',
+                    'update'  => 'smki.formulir-hardening.update',
+                    'destroy' => 'smki.formulir-hardening.destroy',
+                ]);
         });
 
     // ========================================================
