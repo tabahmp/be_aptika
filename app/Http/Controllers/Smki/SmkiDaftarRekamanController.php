@@ -94,9 +94,9 @@ class SmkiDaftarRekamanController extends Controller
     {
         return response()->json([
             'success'      => true,
-            'klasifikasi'  => SmkiRekamanKlasifikasi::select('id', 'nama_klasifikasi')->get(),
-            'retensi'      => SmkiRekamanRetensi::select('id', 'nama_retensi')->get(),
-            'pemilik'      => SmkiRekamanPemilik::select('id', 'nama_pemilik')->get(),
+            'klasifikasi'  => SmkiRekamanKlasifikasi::select('id', 'nama_klasifikasi')->orderBy('nama_klasifikasi')->get(),
+            'retensi'      => SmkiRekamanRetensi::select('id', 'nama_retensi')->orderByRaw('CAST(SUBSTRING_INDEX(nama_retensi, \' \', 1) AS UNSIGNED), nama_retensi')->get(),
+            'pemilik'      => SmkiRekamanPemilik::select('id', 'nama_pemilik')->orderBy('nama_pemilik')->get(),
         ]);
     }
 
@@ -226,12 +226,6 @@ class SmkiDaftarRekamanController extends Controller
      */
     public function update(Request $request, $id)
     {
-        if ($request->user()?->role !== 'admin' && !$request->user()?->isAdminAptika()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Aksi ditolak. Hanya Admin yang memiliki izin mengubah data rekaman.',
-            ], 403);
-        }
         $rekaman = SmkiDaftarRekaman::findOrFail($id);
 
         $validated = $request->validate([
@@ -289,12 +283,6 @@ class SmkiDaftarRekamanController extends Controller
      */
     public function destroy($id)
     {
-        if (request()->user()?->role !== 'admin' && !request()->user()?->isAdminAptika()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Aksi ditolak. Hanya Admin yang memiliki izin menghapus data rekaman.',
-            ], 403);
-        }
         $rekaman = SmkiDaftarRekaman::findOrFail($id);
         $rekaman->delete();
 
