@@ -1412,6 +1412,20 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
             Route::get('software-standar/export-docx', [\App\Http\Controllers\Smki\SmkiSoftwareStandarController::class, 'exportDocx']);
             Route::apiResource('software-standar', \App\Http\Controllers\Smki\SmkiSoftwareStandarController::class);
 
+            // Daftar Rekaman (Formulir FR-003)
+            Route::get('daftar-rekaman/lookup', [\App\Http\Controllers\Smki\SmkiDaftarRekamanController::class, 'lookup'])
+                ->name('smki.daftar-rekaman.lookup');
+            Route::get('daftar-rekaman/export-docx', [\App\Http\Controllers\Smki\SmkiDaftarRekamanController::class, 'exportDocx'])
+                ->name('smki.daftar-rekaman.export-docx');
+            Route::apiResource('daftar-rekaman', \App\Http\Controllers\Smki\SmkiDaftarRekamanController::class)
+                ->names([
+                    'index'   => 'smki.daftar-rekaman.index',
+                    'store'   => 'smki.daftar-rekaman.store',
+                    'show'    => 'smki.daftar-rekaman.show',
+                    'update'  => 'smki.daftar-rekaman.update',
+                    'destroy' => 'smki.daftar-rekaman.destroy',
+                ]);
+
             // Berita Acara Penghancuran Media (FR014-SMKI)
             Route::get('berita-acara/lookup', [\App\Http\Controllers\Smki\SmkiBeritaAcaraController::class, 'lookup'])
                 ->name('smki.berita-acara.lookup');

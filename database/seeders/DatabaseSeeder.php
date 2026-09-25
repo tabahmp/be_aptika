@@ -43,5 +43,13 @@ class DatabaseSeeder extends Seeder
             ProjectDataSeeder::class,
             BeritaAcaraSeeder::class,
         ]);
+
+        // Seed Aset TI & SMKI
+        $this->call([
+            AsetTiMasterSeeder::class,
+            DaftarAsetTiSeeder::class,
+            SmkiSoftwareStandarSeeder::class,
+            SmkiFormulirHardeningSeeder::class,
+        ]);
     }
 }
